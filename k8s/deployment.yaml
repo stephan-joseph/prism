@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: prism
-          image: YOUR_DOCKERHUB_USERNAME/prism:latest
+                    image: stejose/prism:latest
           ports:
             - containerPort: 80
 ---
