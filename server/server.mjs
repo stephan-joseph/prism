@@ -18,7 +18,11 @@ const env = process.env;
 const routes = {
   "/.netlify/functions/extract-status": ["GET", statusHandler({ jobs })],
   "/.netlify/functions/extract-inputs-background": ["POST", extractHandler({
-    jobs, usage, env, makeClient: (apiKey) => new Anthropic({ apiKey }),
+    jobs, usage, env, makeClient: (e) => new Anthropic({
+      /* A gateway token is sent as "Authorization: Bearer"; a plain key as "x-api-key". The token wins if both are set. */
+      ...(e.ANTHROPIC_AUTH_TOKEN ? { authToken: e.ANTHROPIC_AUTH_TOKEN, apiKey: null } : { apiKey: e.ANTHROPIC_API_KEY }),
+      ...(e.ANTHROPIC_BASE_URL ? { baseURL: e.ANTHROPIC_BASE_URL } : {}),
+    }),
     AnthropicErrors: { AuthenticationError: Anthropic.AuthenticationError, RateLimitError: Anthropic.RateLimitError, APIError: Anthropic.APIError },
   })],
   "/.netlify/functions/extract-usage": ["GET", usageHandler({ usage, env })],

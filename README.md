@@ -140,6 +140,7 @@ Set these in Site configuration → Environment variables:
 | Variable | Required | Purpose |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Yes | Anthropic API key. It stays on the server; the page never sees it. |
+| `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `EXTRACTION_MODEL` | Optional, EKS server only (`server/`) | Use an Anthropic-compatible gateway. The token is sent as a Bearer token and wins over `ANTHROPIC_API_KEY`. `EXTRACTION_MODEL` sets the model (default `claude-opus-5-5`). With a base URL set, the plain request is used (no beta flag, fallbacks or effort); set `EXTRACTION_SIMPLE_REQUEST=0` to send them. Not used by the Netlify functions. |
 | `INTAKE_PASSPHRASE` | Recommended | If set, the page must send this passphrase (users type it once; it is remembered in their browser). Stops anyone with the URL spending your API credit. |
 
 Netlify installs `package.json` dependencies (`@anthropic-ai/sdk`, `@netlify/blobs`, `@netlify/functions`) at build time. There is no build command.

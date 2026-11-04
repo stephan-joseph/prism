@@ -3,7 +3,7 @@
 import { buildExtractionPrompt, parseJsonReply, sanitizeExtraction } from "../extract-prompt.mjs";
 import { costOf, logRun, summarize } from "../lib/usage.mjs";
 
-export const MODEL = "claude-opus-5-5";
+export const DEFAULT_MODEL = "claude-opus-5-5";
 export const MAX_CHARS = 600_000;
 
 const json = (body, status = 200) =>
@@ -20,6 +20,11 @@ export function statusHandler({ jobs }) {
 
 /* POST /.netlify/functions/extract-inputs-background : answers 202 at once, the work continues in the process */
 export function extractHandler({ jobs, usage, env, makeClient, AnthropicErrors = {} }) {
+  /* Settings. Without the gateway variables the behaviour is the original one (Anthropic direct, Opus, beta fallback). */
+  const MODEL = env.EXTRACTION_MODEL || DEFAULT_MODEL;
+  /* A gateway may not pass the beta flag, fallbacks or effort through, so the plain request is the default when a base URL is set. */
+  const simple = env.EXTRACTION_SIMPLE_REQUEST ? env.EXTRACTION_SIMPLE_REQUEST === "1" : !!env.ANTHROPIC_BASE_URL;
+  const hasCredential = !!(env.ANTHROPIC_AUTH_TOKEN || env.ANTHROPIC_API_KEY);
   const run = async (body) => {
     const jobId = body.jobId;
     const t0 = Date.now();
@@ -50,17 +55,15 @@ export function extractHandler({ jobs, usage, env, makeClient, AnthropicErrors =
     const total = docs.reduce((n, d) => n + d.text.length, 0);
     info.docs = docs.length; info.chars = total; info.docTypes = docs.map((d) => String(d.type || "other").slice(0, 20));
     if (total > MAX_CHARS) return fail(`Documents are too long (${total.toLocaleString()} characters; limit ${MAX_CHARS.toLocaleString()}). Remove a document or paste the relevant sections.`, {}, "too_long");
-    if (!env.ANTHROPIC_API_KEY) return fail("The site has no Anthropic API key configured (ANTHROPIC_API_KEY)", {}, "no_key");
+    if (!hasCredential) return fail("The site has no Anthropic API key configured (ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN)", {}, "no_key");
 
     await jobs.setJSON(jobId, { status: "running" });
     try {
-      const client = makeClient(env.ANTHROPIC_API_KEY);
-      const stream = client.beta.messages.stream({
-        model: MODEL, max_tokens: 16000,
-        betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
-        output_config: { effort: "high" },
-        messages: [{ role: "user", content: buildExtractionPrompt(docs) }],
-      });
+      const client = makeClient(env);
+      const request = { model: MODEL, max_tokens: 16000, messages: [{ role: "user", content: buildExtractionPrompt(docs) }] };
+      const stream = simple
+        ? client.messages.stream(request)
+        : client.beta.messages.stream({ ...request, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", output_config: { effort: "high" } });
       const message = await stream.finalMessage();
       apiMessage = message;
       if (message.stop_reason === "refusal") return fail("Claude declined to process these documents", {}, "refused");

@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: prism
-          image: stejose/prism:20261105-3
+          image: stejose/prism:20261105-4
           ports:
             - containerPort: 8080
           env:
@@ -29,6 +29,13 @@ spec:
             # Optional, so the pod starts without it (extraction then says the key is missing).
             - name: ANTHROPIC_API_KEY
               valueFrom: {secretKeyRef: {name: prism-secrets, key: ANTHROPIC_API_KEY, optional: true}}
+            # Internal gateway: the token is sent as a Bearer token. The URL is not secret.
+            - name: ANTHROPIC_AUTH_TOKEN
+              valueFrom: {secretKeyRef: {name: prism-secrets, key: ANTHROPIC_AUTH_TOKEN, optional: true}}
+            - name: ANTHROPIC_BASE_URL
+              value: https://api.thoughtworks.polis.thoughtworks-labs.net
+            - name: EXTRACTION_MODEL
+              value: claude-sonnet-5-5
             - name: INTAKE_PASSPHRASE
               valueFrom: {secretKeyRef: {name: prism-secrets, key: INTAKE_PASSPHRASE, optional: true}}
             - name: USAGE_ADMIN_KEY
