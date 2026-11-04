@@ -1,0 +1,12 @@
+.git
+.gitignore
+netlify
+node_modules
+scripts
+docs
+k8s
+deployment.yaml
+Dockerfile
+.dockerignore
+CLAUDE.md
+README.md
