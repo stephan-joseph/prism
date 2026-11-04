@@ -2,3 +2,5 @@
 .DS_Store
 node_modules/
 package-lock.json
+_dbg.html
+_shot.html
