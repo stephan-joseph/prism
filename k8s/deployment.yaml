@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prism
+  namespace: prism-damo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prism
+  template:
+    metadata:
+      labels:
+        app: prism
+    spec:
+      containers:
+        - name: prism
+          image: YOUR_DOCKERHUB_USERNAME/prism:latest
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prism
+  namespace: prism-damo
+spec:
+  type: LoadBalancer
+  selector:
+    app: prism
+  ports:
+    - port: 80
+      targetPort: 80
