@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: prism
-          image: stejose/prism:20261105-2
+          image: stejose/prism:20261105-3
           ports:
             - containerPort: 8080
           env:

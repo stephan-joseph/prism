@@ -51,4 +51,18 @@ let n = 0; const ok = (m) => console.log("ok", ++n, m);
   assert.ok(!body.includes("SECRET-DOC-TEXT")); ok("usage report works, no document text");
   const csv = await s.us(mk("/u?format=csv&key=adm")); assert.match(await csv.text(), /^at,outcome/); ok("usage csv");
   const off = await setup({}); assert.equal((await off.us(mk("/u"))).status, 403); ok("usage off without key"); }
+{ /* every file the pages load must be served, with a type the browser accepts */
+  const { readFileSync } = await import("node:fs");
+  const { server } = await import("../server/server.mjs");
+  await new Promise((r) => server.listen(0, r));
+  const base = "http://localhost:" + server.address().port;
+  const need = new Set();
+  for (const f of ["index.html", "guide.html", "usage.html"]) {
+    const html = readFileSync(new URL("../" + f, import.meta.url), "utf8");
+    for (const m of html.matchAll(/(?:import[^"']*from\s*|src=|href=)["'](\.\/[^"']+|\/[^"'\/][^"']*)["']/g)) need.add(m[1].replace(/^\.\//, "/"));
+  }
+  for (const p of need) { const r = await fetch(base + p); assert.equal(r.status, 200, p + " must be served"); }
+  assert.match((await fetch(base + "/extract-prompt.mjs")).headers.get("content-type"), /javascript/); ok("files the pages load are served: " + [...need].join(" "));
+  assert.equal((await fetch(base + "/package.json")).status, 404); ok("other files stay hidden");
+  server.close(); }
 console.log("all server tests pass");

@@ -25,9 +25,9 @@ const routes = {
 };
 
 /* Only these are served. The repo's other files never leave the image. */
-const PAGES = { "/": "index.html", "/index.html": "index.html", "/guide.html": "guide.html", "/usage.html": "usage.html" };
+const PAGES = { "/": "index.html", "/index.html": "index.html", "/guide.html": "guide.html", "/usage.html": "usage.html", "/extract-prompt.mjs": "extract-prompt.mjs" };
 const DOCS = /^\/docs\/[\w.-]+$/;
-const TYPES = { ".html": "text/html; charset=utf-8", ".json": "application/json" };
+const TYPES = { ".html": "text/html; charset=utf-8", ".json": "application/json", ".mjs": "text/javascript; charset=utf-8" };
 
 async function readBody(req) {
   const chunks = []; let n = 0;
