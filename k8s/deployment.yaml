@@ -5,6 +5,9 @@ metadata:
   namespace: prism-damo
 spec:
   replicas: 1
+  # One replica only: extraction jobs are held in this pod's memory.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: prism
@@ -15,14 +18,32 @@ spec:
     spec:
       containers:
         - name: prism
-          image: stejose/prism:20261105-1
+          image: stejose/prism:20261105-2
           ports:
-            - containerPort: 80
+            - containerPort: 8080
+          env:
+            # Create this Secret by hand, it is not in Git:
+            #   kubectl -n prism-damo create secret generic prism-secrets \
+            #     --from-literal=ANTHROPIC_API_KEY=... --from-literal=INTAKE_PASSPHRASE=... \
+            #     [--from-literal=USAGE_ADMIN_KEY=...]
+            # Optional, so the pod starts without it (extraction then says the key is missing).
+            - name: ANTHROPIC_API_KEY
+              valueFrom: {secretKeyRef: {name: prism-secrets, key: ANTHROPIC_API_KEY, optional: true}}
+            - name: INTAKE_PASSPHRASE
+              valueFrom: {secretKeyRef: {name: prism-secrets, key: INTAKE_PASSPHRASE, optional: true}}
+            - name: USAGE_ADMIN_KEY
+              valueFrom: {secretKeyRef: {name: prism-secrets, key: USAGE_ADMIN_KEY, optional: true}}
+          volumeMounts:
+            - name: usage
+              mountPath: /data/usage
           readinessProbe:
-            httpGet: {path: /, port: 80}
+            httpGet: {path: /healthz, port: 8080}
           livenessProbe:
-            httpGet: {path: /, port: 80}
+            httpGet: {path: /healthz, port: 8080}
             initialDelaySeconds: 10
           resources:
-            requests: {cpu: 50m, memory: 32Mi}
-            limits: {cpu: 250m, memory: 128Mi}
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+      volumes:
+        - name: usage
+          emptyDir: {}

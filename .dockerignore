@@ -1,12 +1,13 @@
 .git
 .gitignore
-netlify
 node_modules
+netlify
+netlify.toml
 scripts
-docs
 k8s
 deployment.yaml
 Dockerfile
 .dockerignore
 CLAUDE.md
 README.md
+package-lock.json
