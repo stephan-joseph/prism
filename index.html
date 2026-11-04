@@ -1213,6 +1213,24 @@ tr.sel td{background:var(--accent-soft)}
       <div class="verdict" id="termVerdict"></div>
     </div>
 
+    <div class="panel" style="margin-top:20px" id="prodPanel">
+      <header><h3>Productivity commitment</h3><span class="sub">The year-on-year reduction we commit to the client · proposed</span></header>
+      <div class="hint" style="margin-bottom:8px">The year-by-year team follows this line. The use cases below, and the baseline productivity, are the evidence for it: where they fall short, the gap is delivery risk we carry. The framework's year-on-year targets are 10 to 20%; 12% is the default.</div>
+      <label class="switch" for="prodOn"><input type="checkbox" id="prodOn"><div><b>Commit to a year-on-year reduction</b><span>Off: the team follows only what the use cases or the scenario percentage deliver.</span></div></label>
+      <div class="row" style="margin:10px 0">
+        <label class="inline" for="prodPct">Reduction a year <input id="prodPct" type="number" min="0" max="30" step="0.5" style="width:80px">%</label>
+        <label class="inline" for="prodFrom">Starting in <select id="prodFrom"><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option></select></label>
+        <label class="inline" for="prodBase" id="prodBaseRow">Baseline productivity outside the use cases <input id="prodBase" type="number" min="0" max="15" step="0.5" style="width:70px">% a year</label>
+      </div>
+      <div class="hint" id="prodBaseHint" style="margin-bottom:8px"></div>
+      <div class="loc-table"><table>
+        <thead><tr><th>Year</th><th class="r">Modelled team</th><th class="r">Committed team</th><th class="r">Gap</th><th class="r">Supported</th></tr></thead>
+        <tbody id="prodTable"></tbody>
+      </table></div>
+      <div id="prodChart" style="max-width:640px;margin-top:10px"></div>
+      <div class="verdict" id="prodVerdict"></div>
+    </div>
+
     <div class="panel" style="margin-top:20px" id="pfPanel" hidden>
       <header><h3>AIOps use-case portfolio</h3><span class="sub">What the AI engineers build, and the effort it removes</span></header>
       <div class="hint" style="margin-bottom:8px">Catalogue, deflection and ramp are proposed (from the DAMO estimator). Deflection applies to the L2 or L3 effort of towers with AIOps in scope, combined per level and capped at the automation ceiling. The team for each year is set from the deflection reached by the end of the previous year.</div>
@@ -1221,7 +1239,7 @@ tr.sel td{background:var(--accent-soft)}
         <div class="hint">Year 1 is the default. Set a different year for any use case in the table; it overrides this.</div>
       </div>
       <div class="loc-table"><table>
-        <thead><tr><th>On</th><th>Use case</th><th>Level</th><th class="r">Build, person-weeks</th><th class="r">Deflection %</th><th>Live from</th><th class="r">Ramp, months</th></tr></thead>
+        <thead><tr><th>On</th><th>Use case</th><th>Level</th><th class="r">Build, person-weeks</th><th class="r">Deflection %</th><th>Live from</th><th class="r">Ramp, months</th><th>Autonomy (agentic)</th></tr></thead>
         <tbody id="pfTable"></tbody>
       </table></div>
       <h4 style="margin:16px 0 6px">When each use case takes effect</h4>
@@ -1855,7 +1873,7 @@ function defaultsRaw(){
   return {
     aiopsPf:{mode:"portfolio",from:1},
     deal:"",active:0,
-    region:"eu",custLoc:"c_uk",days:5,hours:24,start:0,tz:0,fteHours:40,util1:85,minSenior:1,weekendMode:"active",support:"active",oncall1:15,ocMode:"flat",p1PerMonth:null,p1Hours:3,standby:10,
+    region:"eu",custLoc:"c_uk",days:5,hours:24,start:0,tz:0,fteHours:40,util1:85,minSenior:1,weekendMode:"active",support:"active",prod:{on:true,pct:12,from:2,base:3},oncall1:15,ocMode:"flat",p1PerMonth:null,p1Hours:3,standby:10,
     perShift:{L2:1,L3:1},
     locations:[pickLoc("in"),pickLoc("ro")],
     backfill:true,
@@ -2002,6 +2020,9 @@ function migrate(p){
       st.cm=Object.assign(defaults().cm,(p.cm&&typeof p.cm==="object")?p.cm:{});["histMonths","ceiling"].forEach(k=>{if(st.cm[k]===""||st.cm[k]===undefined||isNaN(+st.cm[k]))st.cm[k]=null});if(["unknown","yes","no"].indexOf(st.cm.baseline)<0)st.cm.baseline="unknown";if(["low","medium","high"].indexOf(st.cm.pressure)<0)st.cm.pressure="medium";
       migrateCoverage(st,p);
       /* estimates saved before the support model was an input: read it from the windows they already have */
+      /* estimates saved before the productivity commitment keep their own method: no commitment line, and no agentic use cases switched on */
+      st.prod=p.prod&&typeof p.prod==="object"?Object.assign({on:true,pct:12,from:2,base:3},p.prod):{on:false,pct:12,from:2,base:0};
+      if(st.aiopsPf&&st.aiopsPf.uc)["agt","agr","agm","age","agq","agk"].forEach(id=>{if(!st.aiopsPf.uc[id])st.aiopsPf.uc[id]={on:false}});
       if(p.support!=="active"&&p.support!=="passive")st.support=st.locations.some(l=>(l.win||[]).some(w=>w.m==="oncall"))?"passive":"active";
       return st;
     }
@@ -2307,32 +2328,48 @@ function compute(){
   const tierFte={L2:0,L3:0};let ceilW=0,ceilAcc=0;
   aiTowers.forEach(t=>{const k=bf2*(1+rp2);tierFte.L2+=(t.fte2-t.fte1)*k;tierFte.L3+=t.fte3*k;ceilW+=t.run;ceilAcc+=t.run*(CEILING[t.kind]||50)});
   const ceiling=ceilW>0?ceilAcc/ceilW/100:0;
-  const pfItems=USECASES.map(u=>{const c=PF.uc[u.id];const startY=+c.start>0?Math.round(+c.start):aiFrom;return {u,c,startY,inScope:tierFte[u.tier]>0,on:!!c.on&&tierFte[u.tier]>0}});
+  const pfItems=USECASES.map(u=>{const c=PF.uc[u.id];const startY=+c.start>0?Math.round(+c.start):aiFrom+(u.wave||0);return {u,c,startY,inScope:tierFte[u.tier]>0,on:!!c.on&&tierFte[u.tier]>0}});
   const levelAt=(it,monthEnd)=>{const el=monthEnd-(it.startY-1)*12, m=Math.max(0,+it.c.ramp||0);return el<=0?0:m<=0?1:Math.min(1,el/m)};
   const pfYears=[1,2,3,4,5].map(n=>{
     const end=(n-1)*12, sh={L2:[],L3:[]};
     const ucl={};
-    pfItems.filter(i=>i.on).forEach(i=>{const v=Math.max(0,Math.min(100,+i.c.defl||0))/100*levelAt(i,end)*pathMul;sh[i.u.tier].push(v);ucl[i.u.id]=v});
+    pfItems.filter(i=>i.on).forEach(i=>{const v=Math.max(0,Math.min(100,+i.c.defl||0))/100*levelAt(i,end)*pathMul*ucMul(i.u,i.c);sh[i.u.tier].push(v);ucl[i.u.id]=v});
     const comb=k=>Math.min(ceiling,1-sh[k].reduce((p,x)=>p*(1-x),1));
     const dL2=comb("L2"), dL3=comb("L3"), gross=tierFte.L2*dL2+tierFte.L3*dL3;
     const rz=PF.realize, rs=(+rz.reduce||0)+(+rz.redeploy||0)+(+rz.commit||0)||1;
     return {n,uc:ucl,dL2,dL3,gross,reduce:gross*(+rz.reduce||0)/rs,redeploy:gross*(+rz.redeploy||0)/rs,commit:gross*(+rz.commit||0)/rs,
-      build:pfItems.filter(i=>i.on&&i.startY===n).reduce((x,i)=>x+i.u.effort,0)};
+      build:pfItems.filter(i=>i.on&&i.startY===n).reduce((x,i)=>x+ucEff(i.u,i.c),0)};
   });
   /* the use-case method needs AIOps in scope on at least one tower; otherwise the scenario percentage applies */
   const pfMode=PF.mode==="portfolio"&&aiTowers.length>0;
+  /* what the savings model delivers (use cases, or the scenario percentage) against what we commit to. With a commitment on, the team follows the
+     committed path, kept above the coverage floor; the gap is what the model does not support */
+  const PR=prodOf();
+  /* with the use-case method, baseline productivity (runbooks, automation, learning curve outside the use cases) compounds on top of the use-case savings; the scenario percentage already includes it */
+  const modelled=n=>{const py=pfYears[n-1];if(!pfMode)return floor+(sub5-floor)*Math.pow(1-r7,n-1);const x=Math.max(floor,sub5-py.reduce-py.commit);return floor+(x-floor)*Math.pow(1-PR.base/100,n-1)};
+  const committed=n=>PR.on&&n>=PR.from?Math.max(floor,sub5*Math.pow(1-PR.pct/100,n-PR.from+1)):sub5;
   const years=[1,2,3,4,5].map(n=>{
-    const py=pfYears[n-1];
-    const base=pfMode?Math.max(floor,sub5-py.reduce-py.commit):floor+(sub5-floor)*Math.pow(1-r7,n-1);
+    const mB=modelled(n), cB=committed(n), base=PR.on?cB:mB;
     const c=(n===1?contPct:cont2)/100*(1+rp6);
     let f=base*(1+c);
     if(n>1)f*=1+rp7;
-    return {n,base,cont:base*c,fte:f};
+    return {n,base,cont:base*c,fte:f,mBase:mB,cBase:cB,gap:PR.on?mB-cB:0};
   });
   const termRows=[1,2,3,4,5].map(T=>{const ys=years.slice(0,T);const sumY=ys.reduce((x,y)=>x+y.fte,0);return {T,ys,sum:sumY,avg:sumY/T}});
   termRows.forEach(t=>t.vs1=1-t.avg/termRows[0].avg);
   const term=Math.min(5,Math.max(1,+S.term||1));
-  const warningsSk=[];
+  const warningsSk=[], notes2=[];
+  /* a tower that adds no FTE is almost always unfinished: say why, on the tower and in the working */
+  towers.forEach(t=>{
+    t.emptyWarn=null;
+    if(t.fte>=0.005)return;
+    t.emptyWarn=t.sv==="none"?"We provide none of L1, L2 or L3 on this tower, so it adds no FTE. Set which levels we provide."
+      :t.src==="Not answered yet"?"No demand has been entered yet, so this tower adds no FTE. Answer the questions below: ticket history, or the structural size of the estate."
+      :"Its demand inputs add up to zero, so this tower adds no FTE.";
+    warnings2.push(`${t.name}: ${t.emptyWarn.charAt(0).toLowerCase()+t.emptyWarn.slice(1)}`);
+  });
+  /* the team is the larger of the base team (Step 1) and the team built from the towers: say so when coverage is the larger one */
+  if(towers.some(t=>t.fte>=0.005)&&p1lift>0.05)notes2.push(`Coverage sets the team. The towers need ${fmt(p1run,2)} FTE, the base team from the support window needs ${fmt(s1,2)}, and Prism uses the larger. Towers change the total only once they pass ${fmt(s1,2)} FTE. If the support window is not what the customer asks for, change it in Step 1.`);
   towers.filter(t=>t.l1Unknown).forEach(t=>warnings2.push(`${t.name}: we provide L1 but the ticket counts are at ${t.lvl.toUpperCase()}, so L1 volume is unknown and no L1 effort is sized. Enter counts of all tickets (L1).`));
   towers.filter(t=>t.l2Unknown).forEach(t=>warnings2.push(`${t.name}: the ticket counts are at L3, so the L2 volume is unknown and no L2 effort is sized. Enter counts at L1 or L2, or choose L3 only.`));
   if(towers.length&&towers.every(t=>t.sv==="l2")&&S.perShift.L3>0)[warnings,warnings2].forEach(w=>w.push(`Every tower is L2 only, but the base team puts ${S.perShift.L3} L3 on every shift. Set L3 per shift to 0 in Step 1 if no L3 cover is needed.`));
@@ -2448,13 +2485,13 @@ function compute(){
   const bridge={d3:snaps[3].fte-p1total,d4:snaps[4].fte-snaps[3].fte,d5:snaps[5].fte-snaps[4].fte,spare:p1lift};
   return {p1,bridge,days,fteH,reqH,c,framework,actH,oncH,blocks,cover,oc1,p1Busy,aEff,rp1,locs,roster,buffered,s1,warnings,
     u1,utilised,utilAdd:utilised-roster,leaveAdd:buffered-utilised,risk1Add:s1-buffered,
-    towers,skills,demand,demAbs,capacity,absorbed,added,add2,add3,rp2,s2,s2run,bf2,leave2,risk2Add:s2run-added*bf2,warnings2,warningsSk,
+    towers,skills,demand,demAbs,capacity,absorbed,added,add2,add3,rp2,s2,s2run,bf2,leave2,risk2Add:s2run-added*bf2,warnings2,notes2,warningsSk,
     aiTowers,aiBase,scRatio,ai2,
     covSkills,topUp,rp3,s3,risk3Add:s3-topUp,sub2:s2,sub3,runTeam,workTeam,runWork,lift,
     volShare,volAvail,sc,SC,transPct,transAuto,stageMul,appMul,pathMul,pod,autoRatio,ratio:aiRatioN,aiops,stage4raw,otherTrans,rp4,s4,risk4Add:s4-stage4raw,
     sub4,sdmRatio,sdmRaw,rp5,s5,risk5Add:s5-sdmRaw,sdmLoc,
     sub5,CX,contPct,contRaw,rp6,s6,risk6Add:s6-contRaw,pyr,shares,
-    savePct,cont2,floor,rp7,years,termRows,term,pf:{mode:PF.mode,active:pfMode,from:PF.from,items:pfItems,years:pfYears,tierFte,ceiling,aiFrom,capacity:ai2*BUILD_PW,realize:PF.realize},
+    savePct,cont2,floor,rp7,years,prod:PR,termRows,term,pf:{mode:PF.mode,active:pfMode,from:PF.from,items:pfItems,years:pfYears,tierFte,ceiling,aiFrom,capacity:ai2*BUILD_PW,realize:PF.realize},
     total,people,roundAdd:people-total,roles,trans,fin,
     snaps,L2:sum(locs,"c2"),L3:sum(locs,"c3"),G:sum(locs,"g"),L2p:sum(locs,"p2"),L3p:sum(locs,"p3"),Gp:sum(locs,"pg")};
 }
@@ -2475,12 +2512,26 @@ const USECASES=[
   {id:"sh",n:"Self-healing workflows",effort:20,defl:9.0,tier:"L2",pre:["ia","rb"]},
   {id:"pa",n:"Predictive alerting",effort:16,defl:5.5,tier:"L2",pre:["ad"]},
   {id:"ps",n:"Predictive scaling",effort:12,defl:3.5,tier:"L2",pre:["ad"]},
-  {id:"ce",n:"Chaos engineering",effort:15,defl:3.0,tier:"L3",pre:["sh"]}
+  {id:"ce",n:"Chaos engineering",effort:15,defl:3.0,tier:"L3",pre:["sh"]},
+  /* agentic operations: agents that triage, diagnose and act. Each has an autonomy level that scales how much of its deflection counts and how much build effort it needs (proposed) */
+  {id:"agt",n:"Agentic ticket triage and resolution",effort:14,defl:8.0,tier:"L2",pre:["tc","kr"],kind:"agentic",wave:1},
+  {id:"agr",n:"Agentic root-cause analysis with action proposals",effort:16,defl:7.0,tier:"L3",pre:["kr","at"],kind:"agentic",wave:1},
+  {id:"agm",n:"Agentic remediation with approval",effort:18,defl:9.0,tier:"L2",pre:["rb","at"],kind:"agentic",wave:2},
+  {id:"age",n:"Agentic runbook and change execution",effort:16,defl:6.0,tier:"L2",pre:["rb"],kind:"agentic",wave:2},
+  {id:"agq",n:"Agentic data-quality exception handling",effort:12,defl:5.0,tier:"L2",pre:[],kind:"agentic",wave:1},
+  {id:"agk",n:"Agentic knowledge curation",effort:8,defl:3.0,tier:"L2",pre:["kr"],kind:"agentic",wave:1}
 ];
-const UC_ON=["kr","tc","at","ts","ia","ad","rb"];
+const UC_ON=["kr","tc","at","ts","ia","ad","rb","agt","agr","agm","age"];
+/* agentic use cases come in waves after the assistive ones: a wave is the number of years after the "all use cases go live from" year (a year set on the use case itself overrides it) */
+const AUTO_LEVELS=[["assist","Assist","suggests, a person acts"],["approve","Act with approval","acts after a person approves"],["auto","Autonomous","acts alone within guardrails"]];
+const AUTO_MUL={assist:.5,approve:.8,auto:1}, AUTO_EFF={assist:.8,approve:1,auto:1.3};
+const ucMul=(u,c)=>u.kind==="agentic"?(AUTO_MUL[(c&&c.auto)||"approve"]??.8):1;
+const ucEff=(u,c)=>Math.round(u.effort*(u.kind==="agentic"?(AUTO_EFF[(c&&c.auto)||"approve"]??1):1));
 const CEILING={AMS:60,IMS:70,DMS:50,AI:50};   /* max share of a tower's effort automation can remove; AMS/IMS/DMS from damo-estimator, AI proposed */
 const BUILD_PW=44;                            /* build person-weeks a year per AI engineer, proposed */
-function pfDefaults(){const uc={};USECASES.forEach(u=>uc[u.id]={on:UC_ON.includes(u.id),defl:u.defl,start:0,ramp:6});return {mode:"portfolio",from:1,uc,realize:{reduce:50,redeploy:30,commit:20}}}
+function pfDefaults(){const uc={};USECASES.forEach(u=>uc[u.id]=Object.assign({on:UC_ON.includes(u.id),defl:u.defl,start:0,ramp:6},u.kind==="agentic"?{auto:"approve"}:{}));return {mode:"portfolio",from:1,uc,realize:{reduce:50,redeploy:30,commit:20}}}
+/* the productivity commitment: a year-on-year reduction the estimate commits to from a chosen year (proposed; the framework's YoY targets are 10 to 20%) */
+function prodOf(){const p=S.prod||{};return {on:!!p.on,pct:Math.max(0,Math.min(50,+p.pct||0)),from:Math.max(2,Math.min(5,Math.round(+p.from||2))),base:Math.max(0,Math.min(30,+p.base||0))}}
 function pfOf(){const d=pfDefaults(),p=S.aiopsPf||{};return {mode:p.mode||"flat",from:p.from!=null?+p.from:(p.mode?0:1),uc:Object.fromEntries(USECASES.map(u=>[u.id,Object.assign({},d.uc[u.id],(p.uc||{})[u.id]||{})])),realize:Object.assign({},d.realize,p.realize||{})}}
 
 /* ---------- who provides each support level, and SLA ---------- */
@@ -2803,7 +2854,7 @@ function renderScenarios(){
 }
 
 /* ---------- self-tests: the engine against the framework's worked examples, plus invariants ---------- */
-function testState(mod){const st=defaults();st.backfill=false;st.util1=100;st.risks=Object.fromEntries(Object.keys(st.risks).map(k=>[k,st.risks[k].map(r=>({...r,on:false}))]));mod(st);return st}
+function testState(mod){const st=defaults();st.prod={on:false,pct:12,from:2};st.backfill=false;st.util1=100;st.risks=Object.fromEntries(Object.keys(st.risks).map(k=>[k,st.risks[k].map(r=>({...r,on:false}))]));mod(st);return st}
 function amsTower(inc,extra){return Object.assign(mkTower("AMS"),{vol:true,inc,sr:0,estate:"modern",skills:[mkSkill("be",100)]},extra||{})}
 function runSelfTests(){
   const out=[], near=(a,b,tol)=>Math.abs(a-b)<=(tol==null?0.01:tol), add=(name,exp,got,pass,src)=>out.push({name,exp,got,pass:!!pass,src});
@@ -2953,6 +3004,26 @@ function runSelfTests(){
   add("This estimate: allowances add up to the Year 1 team",fmt(R.total,2),fmt(A.core+A.util+A.leave+A.cont+A.risk,2),near(A.core+A.util+A.leave+A.cont+A.risk,R.total),"invariant");
   add("This estimate: Year 1 of the term is the Year 1 team",fmt(R.total,2),fmt(R.years[0].fte,2),near(R.years[0].fte,R.total),"invariant");
   add("This estimate: bottom bar after Step 8 is the Year 1 team",fmt(R.total,2),fmt(R.snaps[6].fte,2),near(R.snaps[6].fte,R.total),"invariant");
+  /* the productivity commitment and agentic use cases */
+  {const big=st=>{st.hours=24;st.days=5;autoLayout(st);st.towers=[amsTower(800,{own:{L1:"us",L2:"us",L3:"us"}})]};
+   withState(testState(st=>{big(st);st.prod={on:true,pct:12,from:2}}),R=>{const y=R.years;
+     add("A 12% commitment from Year 2 compounds on the Year 1 base",`Y2 = Y1 × 0.88, Y3 = Y1 × 0.88²`,`Y2 ${fmt(y[1].base/y[0].base,3)}, Y3 ${fmt(y[2].base/y[0].base,3)}`,near(y[1].base/y[0].base,0.88,0.002)&&near(y[2].base/y[0].base,0.7744,0.002),"commitment");
+     add("The committed path is never below the coverage floor","every year at or above the floor",`lowest base ${fmt(Math.min(...y.map(v=>v.base)),2)}, floor ${fmt(R.floor,2)}`,y.every(v=>v.base>=R.floor-1e-9),"commitment")});
+   withState(testState(st=>{big(st);st.prod={on:true,pct:12,from:2};st.aiopsPf=undefined;st.towers[0].aiops=false}),R=>{const g=R.years[2].gap;
+     add("Where the model saves less than the commitment, the gap is shown","modelled team above the committed team",`gap ${fmt(g,2)} FTE in Year 3`,g>0.05&&R.years[2].mBase>R.years[2].cBase,"commitment")});
+   withState(testState(st=>{big(st);st.prod={on:false,pct:12,from:2}}),R=>add("With the commitment off the team follows the model","base equals modelled, no gap",`gap ${fmt(R.years[2].gap,2)}`,R.years.every(v=>near(v.base,v.mBase,1e-9)&&v.gap===0),"commitment"));
+   const defl=auto=>withState(testState(st=>{big(st);st.towers[0].aiops=true;st.aiopsPf=pfDefaults();st.aiopsPf.from=1;st.aiopsPf.uc.agt.auto=auto;st.aiopsPf.uc.agm.auto=auto}),R=>({d:R.pf.years[4].dL2,b:R.pf.years[4].build+R.pf.years[1].build+R.pf.years[2].build}));
+   {const a=defl("assist"),c=defl("auto");add("A higher autonomy level removes more effort and needs more build","autonomous beats assist on both",`deflection ${fmt(a.d*100,1)}% → ${fmt(c.d*100,1)}%, build ${a.b} → ${c.b} pw`,c.d>a.d&&c.b>a.b,"agentic")}
+   {const withBase=b=>withState(testState(st=>{big(st);st.towers[0].aiops=true;st.aiopsPf=pfDefaults();st.aiopsPf.from=1;st.prod={on:false,pct:12,from:2,base:b}}),R=>R.years[3].mBase);
+    const b0=withBase(0), b3=withBase(3);add("Baseline productivity lowers the modelled team on top of the use cases","a lower Year 4 team with 3% than with 0%",`${fmt(b3,2)} vs ${fmt(b0,2)} FTE`,b3<b0-0.05,"commitment")}
+   const old=migrate({deal:"Old",towers:[],aiopsPf:{mode:"portfolio",from:1,uc:{kr:{on:true}}}});
+   add("An estimate saved before the commitment keeps its own method","no commitment, agentic use cases off",`commitment ${old.prod.on?"on":"off"}, agentic ${old.aiopsPf.uc.agt.on?"on":"off"}`,old.prod.on===false&&old.aiopsPf.uc.agt.on===false,"commitment");
+   add("A new estimate starts with a 12% commitment from Year 2","on, 12%, Year 2",`${defaults().prod.on?"on":"off"}, ${defaults().prod.pct}%, Year ${defaults().prod.from}`,defaults().prod.on&&defaults().prod.pct===12&&defaults().prod.from===2,"commitment")}
+  /* the two Step 2 warnings */
+  withState(testState(st=>{st.towers=[mkTower("IMS")]}),R=>add("An empty tower says why it adds no FTE","a warning that no demand has been entered",R.warnings2.find(w=>/no demand has been entered/.test(w))?"warning shown":"no warning",R.warnings2.some(w=>/no demand has been entered/.test(w))&&!!R.towers[0].emptyWarn,"step 2 warnings"));
+  withState(testState(st=>{st.towers=[amsTower(100,{own:{L1:"customer",L2:"customer",L3:"vendor"}})]}),R=>add("A tower where we provide no level says so","a warning that we provide none of L1, L2 or L3",R.warnings2.find(w=>/we provide none/.test(w))||"no warning",R.warnings2.some(w=>/we provide none/.test(w)),"step 2 warnings"));
+  withState(testState(st=>{st.hours=24;st.days=5;autoLayout(st);st.towers=[amsTower(100,{})]}),R=>add("When coverage is the larger team, a note says so","a note that coverage sets the team",R.notes2.length?"note shown":"no note",R.notes2.length===1&&/Coverage sets the team/.test(R.notes2[0])&&R.p1.lift>0,"step 2 warnings"));
+  withState(testState(st=>{st.hours=24;st.days=5;autoLayout(st);st.towers=[amsTower(1500,{})]}),R=>add("When the towers are the larger team, there is no coverage note","no note",R.notes2.length?"note shown":"no note",R.notes2.length===0&&R.warnings2.every(w=>!/no demand|we provide none/.test(w)),"step 2 warnings"));
   /* applying an extracted tower: merge into an existing tower of the same kind, or add a new one */
   {const ex=Object.assign(mkTower("AMS"),{name:"Retail",vol:true,inc:300,sr:40,cr:5}), prop={kind:"AMS",volumetrics:{incidentsPerMonth:150},aiopsInScope:true};
    const up=buildTowerFromProposal(prop,ex), nw=buildTowerFromProposal(prop,null);
@@ -3238,6 +3309,7 @@ function renderS2(){
         <div class="hint" id="tx-${t.id}"></div></div>`:"";
     return `<div class="tower" data-tower="${t.id}">
       <div class="th"><span class="kbadge">${t.kind}</span><input class="tname" type="text" id="tn-${t.id}" data-tf="name" value="${esc(t.name)}" placeholder="Name this ${t.kind} tower" aria-label="Tower name"><button type="button" class="btn ghost sm" data-rmtower="${t.id}">Remove</button></div>
+      <div class="alert" data-twwarn="${t.id}" hidden style="margin:8px 0"></div>
       <div id="pv-${t.id}"></div>
       <div class="tsec"><span class="h">Who provides each support level</span>
         <div class="seg" role="group" aria-label="Ownership preset">${OWN_PRESETS.map(([k,l,o])=>`<button type="button" data-town="${k}" aria-pressed="${!!t.own&&["L1","L2","L3"].every(x=>t.own[x]===o[x])}">${l}</button>`).join("")}</div>
@@ -3565,7 +3637,8 @@ function updateS2(){
   const A=R.towers.reduce((s2,t)=>s2+t.A,0), Bh=R.towers.reduce((s2,t)=>s2+t.Bh,0);
   const abs=R.skills.filter(k=>k.absorb), non=R.skills.filter(k=>!k.absorb);
   const kn=k=>`${k.tower} · ${k.name}`;
-  let h=R.warnings2.map(w=>`<div class="alert" style="margin-bottom:10px">${esc(w)}</div>`).join("");
+  document.querySelectorAll("[data-twwarn]").forEach(el=>{const tw=R.towers.find(x=>x.id===el.dataset.twwarn),w=tw&&tw.emptyWarn;el.hidden=!w;el.textContent=w||""});
+  let h=R.warnings2.map(w=>`<div class="alert" style="margin-bottom:10px">${esc(w)}</div>`).join("")+R.notes2.map(w=>`<div class="verdict" style="margin-bottom:10px">${esc(w)}</div>`).join("");
   h+=wstep("1","Tickets per month",fmt(tk,0),R.towers.length?R.towers.map(t=>`${esc(t.name)} ${fmt(t.tickets,0)} (${t.src})`).join(" + "):"No towers added");
   const nonStd=R.towers.filter(t=>t.lvl!=="l1"||t.sv!=="both");
   const l1=R.towers.reduce((x,t)=>x+t.l1t,0);
@@ -3898,8 +3971,9 @@ function updateS6(){
 function renderS7(){
   $("termSeg").innerHTML=[1,2,3,4,5].map(n=>`<button type="button" data-term="${n}" aria-pressed="${S.term===n}">${n} year${n>1?"s":""}</button>`).join("");
   $("savePct").value=S.savePct==null?"":S.savePct;
+  {const PRd=prodOf();$("prodOn").checked=PRd.on;$("prodPct").value=PRd.pct;$("prodFrom").value=String(Math.min(4,PRd.from));$("prodBase").value=PRd.base}
   const PF=pfOf();$("pfReduce").value=PF.realize.reduce;$("pfRedeploy").value=PF.realize.redeploy;$("pfCommit").value=PF.realize.commit;
-  $("pfTable").innerHTML=USECASES.map(u=>{const c=PF.uc[u.id];return `<tr data-uc="${u.id}"><td><input type="checkbox" id="uc-${u.id}" data-ucf="on" ${c.on?"checked":""} aria-label="${esc(u.n)}"></td><td class="loc-name"><label for="uc-${u.id}">${esc(u.n)}</label>${u.pre.length?`<small>needs ${u.pre.map(x=>USECASES.find(v=>v.id===x).n).join(", ")}</small>`:""}</td><td>${u.tier}</td><td class="r num">${u.effort}</td><td class="r"><input type="number" data-ucf="defl" min="0" max="50" step="0.5" value="${c.defl}" style="width:70px" aria-label="${esc(u.n)} deflection %"></td><td><select data-ucf="start" aria-label="${esc(u.n)} live from"><option value="0" ${+c.start?"":"selected"}>Scenario default</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${+c.start===n?"selected":""}>Year ${n}</option>`).join("")}</select></td><td class="r"><input type="number" data-ucf="ramp" min="0" max="36" step="1" value="${c.ramp}" style="width:64px" aria-label="${esc(u.n)} ramp months"></td></tr>`}).join("");
+  $("pfTable").innerHTML=USECASES.map(u=>{const c=PF.uc[u.id];return `<tr data-uc="${u.id}"><td><input type="checkbox" id="uc-${u.id}" data-ucf="on" ${c.on?"checked":""} aria-label="${esc(u.n)}"></td><td class="loc-name"><label for="uc-${u.id}">${esc(u.n)}</label>${u.kind==="agentic"?`<small>agentic</small>`:""}${u.pre.length?`<small>needs ${u.pre.map(x=>USECASES.find(v=>v.id===x).n).join(", ")}</small>`:""}</td><td>${u.tier}</td><td class="r num">${ucEff(u,c)}</td><td class="r"><input type="number" data-ucf="defl" min="0" max="50" step="0.5" value="${c.defl}" style="width:70px" aria-label="${esc(u.n)} deflection %"></td><td><select data-ucf="start" aria-label="${esc(u.n)} live from"><option value="0" ${+c.start?"":"selected"}>Scenario default</option>${[1,2,3,4,5].map(n=>`<option value="${n}" ${+c.start===n?"selected":""}>Year ${n}</option>`).join("")}</select></td><td class="r"><input type="number" data-ucf="ramp" min="0" max="36" step="1" value="${c.ramp}" style="width:64px" aria-label="${esc(u.n)} ramp months"></td><td>${u.kind==="agentic"?`<select data-ucf="auto" aria-label="${esc(u.n)} autonomy">${AUTO_LEVELS.map(([k,l,d])=>`<option value="${k}" ${(c.auto||"approve")===k?"selected":""} title="${esc(d)}">${l}</option>`).join("")}</select>`:""}</td></tr>`}).join("");
   $("cont2").value=S.cont2==null?"":S.cont2;
   $("protectFloor").checked=S.protectFloor!==false;
 }
@@ -3926,10 +4000,33 @@ function updateS7(){
   $("cont2").placeholder=String(Math.min(R.contPct,6));
   $("cont2Hint").textContent=`Year 1 uses ${R.contPct}% from Step 8. Leave blank to use ${Math.min(R.contPct,6)}% from Year 2.`;
   const T=R.term, tr=R.termRows[T-1], y=R.years, P=R.pf, pfm=P.active, pfSel=P.mode==="portfolio";
+  {const PR=R.prod, kf=i=>y[i].base>0?y[i].fte/y[i].base:1, src=pfm?(PR.base>0?"use cases and baseline productivity":"use cases"):"scenario percentage";
+   $("prodBaseRow").hidden=!pfm;$("prodBaseHint").textContent=pfm?"Non-AI gains: runbook maturity, automation and the learning curve. Proposed at 3% a year; set 0 to count only the use cases.":"The scenario percentage is in use, and it already includes baseline productivity.";
+   const supOf=v=>PR.on&&v.n>=PR.from&&R.sub5-v.cBase>0.001?Math.max(0,Math.min(1,(R.sub5-v.mBase)/(R.sub5-v.cBase))):null;
+   $("prodTable").innerHTML=y.map((v,i)=>{const k=kf(i),g=v.gap*k,sup=supOf(v);
+     return `<tr class="${v.n>T?"off":""}"><td class="loc-name">Year ${v.n}</td><td class="r num">${fmt(v.mBase*k,2)}</td><td class="r num">${PR.on?fmt(v.cBase*k,2):"–"}</td><td class="r num" style="${PR.on&&g>0.05?"color:var(--risk)":""}">${PR.on?(g>0.05?"+":"")+fmt(g,2):"–"}</td><td class="r num">${sup==null?"–":fmt(sup*100,0)+"%"}</td></tr>`}).join("");
+   const yT=y[T-1], kT=kf(T-1), gapT=yT.gap*kT, red=y[0].base>0?1-yT.cBase/y[0].base:0, supT=supOf(yT), sumGap=y.slice(0,T).reduce((x,v,i)=>x+Math.max(0,v.gap*kf(i)),0);
+   $("prodVerdict").innerHTML=!PR.on?`<b>No commitment.</b> The team follows what the ${src} deliver${T>1?`: ${fmt(y[0].fte,1)} FTE in Year 1 to ${fmt(yT.fte,1)} in Year ${T}`:""}. Turn the commitment on to see how much of a year-on-year reduction the model supports.`
+     :T<PR.from?`<b>The commitment starts in Year ${PR.from}</b>, after the ${T}-year term you chose, so it does not change this term. Choose a longer term to see it.`
+     :`<b>At ${PR.pct}% a year from Year ${PR.from}, the team is ${fmt(yT.fte,1)} FTE in Year ${T}</b>, ${fmt(red*100,0)}% below the Year 1 base.${yT.cBase<=R.floor+0.001?" The committed path is held at the coverage floor.":""} `
+       +(gapT>0.05?`<b>${fmt(gapT,1)} FTE of that is not yet supported</b> by the ${src}${supT!=null?` (${fmt(supT*100,0)}% supported)`:""}; over the ${T}-year term that is ${fmt(sumGap,1)} FTE-years of delivery risk we carry. To close it: turn on more use cases or raise the autonomy of the agentic ones, bring their waves forward, or lower the commitment.`
+         :`<b>Supported:</b> the ${src} deliver at least the committed reduction (${fmt(Math.max(0,-gapT),1)} FTE of headroom in Year ${T}).`);
+   {const W=560,H=210,L=46,Rr=16,Tp=14,B=30, vals=y.flatMap((v,i)=>[v.mBase*kf(i),PR.on?v.cBase*kf(i):v.mBase*kf(i)]), hi=Math.max(...vals,R.floor,0.01)*1.08, lo=Math.max(0,Math.min(...vals,R.floor)*0.85),
+     X=n=>L+(n-1)*(W-L-Rr)/4, Y=v=>H-B-((v-lo)/(hi-lo))*(H-B-Tp);
+   const line=f=>y.map((v,i)=>`${i?"L":"M"}${X(v.n).toFixed(1)},${Y(f(v,i)).toFixed(1)}`).join(" ");
+   $("prodChart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Modelled and committed team by year" style="width:100%;height:auto;display:block">
+     ${[0,1,2,3].map(i=>{const t=lo+(hi-lo)*i/3;return `<line x1="${L}" x2="${W-Rr}" y1="${Y(t).toFixed(1)}" y2="${Y(t).toFixed(1)}" style="stroke:var(--line)"/><text x="${L-6}" y="${(Y(t)+4).toFixed(1)}" text-anchor="end" font-size="11" style="fill:var(--muted)">${fmt(t,0)}</text>`}).join("")}
+     ${y.map(v=>`<text x="${X(v.n).toFixed(1)}" y="${H-10}" text-anchor="middle" font-size="11" style="fill:var(--muted);${v.n>T?"opacity:.5":""}">Y${v.n}</text>`).join("")}
+     ${R.floor>0&&R.floor>=lo?`<line x1="${L}" x2="${W-Rr}" y1="${Y(R.floor).toFixed(1)}" y2="${Y(R.floor).toFixed(1)}" stroke-dasharray="5 4" style="stroke:var(--add)"/><text x="${W-Rr}" y="${(Y(R.floor)-5).toFixed(1)}" text-anchor="end" font-size="11" style="fill:var(--add)">coverage floor ${fmt(R.floor,1)}</text>`:""}
+     <path d="${line((v,i)=>v.mBase*kf(i))}" fill="none" stroke-width="2.5" style="stroke:var(--accent)"/>
+     ${PR.on?`<path d="${line((v,i)=>v.cBase*kf(i))}" fill="none" stroke-width="2.5" stroke-dasharray="6 4" style="stroke:var(--round)"/>`:""}
+     ${y.map((v,i)=>`<circle cx="${X(v.n).toFixed(1)}" cy="${Y(v.mBase*kf(i)).toFixed(1)}" r="3.5" style="fill:var(--accent)"/>`).join("")}
+     <text x="${L+4}" y="${Tp+2}" font-size="11" style="fill:var(--accent)">modelled (${pfm?"use cases":"scenario %"})</text>${PR.on?`<text x="${L+4}" y="${Tp+16}" font-size="11" style="fill:var(--round)">committed ${PR.pct}% a year</text>`:""}
+   </svg>`}}
   document.querySelectorAll("[data-pfm]").forEach(b=>b.setAttribute("aria-pressed",String(P.mode===b.dataset.pfm)));
   $("saveField").hidden=pfm;$("pfPanel").hidden=!pfSel;
   if($("pfFrom"))$("pfFrom").value=String(P.from);
-  document.querySelectorAll('#pfTable [data-ucf="start"]').forEach(sel=>{const o=sel.options[0];if(o)o.textContent=`Same as all (Year ${P.aiFrom})`});
+  document.querySelectorAll('#pfTable [data-ucf="start"]').forEach(sel=>{const o=sel.options[0],u=USECASES.find(x=>x.id===sel.closest("tr").dataset.uc);if(o)o.textContent=`Same as all (Year ${P.aiFrom+((u&&u.wave)||0)})`});
   $("pfmHint").textContent=pfm?"Savings come from the use cases the AI engineers build (panel below).":pfSel?`No tower has AIOps in scope, so the scenario percentage (${R.savePct}% a year) is used for now. Turn AIOps on for a tower in Step 2 to use the use cases.`:`A flat ${R.savePct}% a year from Year 2 (Scenario ${R.sc} target ${R.SC.savings}), whether or not AIOps is in scope.`;
   if(pfSel){
     const act=P.items.filter(i=>i.on), missing=act.filter(i=>i.u.pre.some(x=>!act.some(a=>a.u.id===x)));
@@ -3964,7 +4061,8 @@ function updateS7(){
   let h="";
   h+=wstep("1","Year 1 team",fmt(y[0].fte,2),"The Step 8 team, with Year 1 contingency");
   h+=wstep("2","Coverage floor",fmt(R.floor,2),S.protectFloor!==false?"Step 1 base team, kept whole every year":"Off: savings apply to the whole team");
-  if(pfm)h+=wstep("3","AIOps savings",`−${fmt(P.years[T-1].reduce+P.years[T-1].commit,2)}`,`By Year ${T}: ${fmt(P.years[T-1].gross,2)} FTE freed by ${P.items.filter(i=>i.on).length} use cases; ${P.realize.reduce}% reduced + ${P.realize.commit}% committed leave the team, ${P.realize.redeploy}% redeployed. Never below the floor`);
+  if(R.prod.on)h+=wstep("3","Productivity commitment",`−${R.prod.pct}%`,`Each year from Year ${R.prod.from}, compounding, never below the floor. The ${pfm?"use cases":"scenario percentage"} ${y.slice(0,T).some(v=>v.gap>0.05)?"fall short of it (see the commitment panel)":"meet it"}`);
+  else if(pfm)h+=wstep("3","AIOps savings",`−${fmt(P.years[T-1].reduce+P.years[T-1].commit,2)}`,`By Year ${T}: ${fmt(P.years[T-1].gross,2)} FTE freed by ${P.items.filter(i=>i.on).length} use cases; ${P.realize.reduce}% reduced + ${P.realize.commit}% committed leave the team, ${P.realize.redeploy}% redeployed. Never below the floor`);
   else h+=wstep("3","YoY savings",`−${R.savePct}%`,`Applied each year from Y2 to the ${fmt(R.sub5-R.floor,2)} FTE above the floor, compounding`);
   h+=wstep("4","Contingency taper",`${R.contPct}% → ${R.cont2}%`,"Year 1 carries transition risk; later years carry less");
   if(nR)h+=wstep("5","Risk modifiers",`+${fmt(R.rp7*100,1)}%`,"Added to Year 2+ FTE");
@@ -4177,7 +4275,7 @@ function updateResults(){
   const rows=buildRows();
   $("finalBuild").innerHTML=rows.map(r=>`<tr><td class="loc-name">${r.stage}</td><td class="hint">${esc(r.what)}</td><td class="r num">${r.add==null?"–":sgn(r.add,2)}</td><td class="r num"><b>${fmt(r.snap.fte,2)}</b>${esc(r.ppl)}</td></tr>`).join("")
     +(whole?`<tr><td class="loc-name">Rounding</td><td class="hint">${({cell:"Up per location and tier; SDM to nearest",loc:"Up per location",total:"Total rounded up"})[S.rounding]}</td><td class="r num">${sgn(R.roundAdd,2)}</td><td class="r num"><b>${fmt(R.people,0)} people</b></td></tr>`:"")
-    +`<tr><td class="loc-name">Stage 3 · Term</td><td class="hint">${R.savePct}% YoY savings from Y2, contingency ${R.contPct}% → ${R.cont2}%</td><td class="r num">–</td><td class="r num"><b>${fmt(tr.avg,2)}</b> avg</td></tr>`
+    +`<tr><td class="loc-name">Stage 3 · Term</td><td class="hint">${R.prod.on?R.prod.pct+"% committed YoY from Y"+R.prod.from:R.savePct+"% YoY savings from Y2"}, contingency ${R.contPct}% → ${R.cont2}%</td><td class="r num">–</td><td class="r num"><b>${fmt(tr.avg,2)}</b> avg</td></tr>`
     +(R.trans.ktW+R.trans.parW?`<tr><td class="loc-name">Transition</td><td class="hint">One-off before service start: ${R.trans.ktW} weeks KT + ${R.trans.parW} weeks parallel run; average ${fmt(R.trans.avg,1)} FTE</td><td class="r num">–</td><td class="r num"><b>${fmt(R.trans.total,1)}</b> FTE-months</td></tr>`:"")
     +`<tr><td class="loc-name">Review · Final fact check</td><td class="hint">${exTot>0?`Existing team ${fmt(exTot,1)} FTE`:"No existing team entered"}</td><td class="r num">–</td><td class="r num">${exTot>0?sgn((R.total-exTot)/exTot*100,0)+"%":"–"}</td></tr>`;
   if(S.active===8)renderDeskViews();
@@ -4383,7 +4481,7 @@ function buildReport(){
   ${stageDoc(6,"Complexity, seniority and contingency: the run team",tableOf("gradeCalc")+`<h3>Estimate confidence · [F] Annexure 1</h3><table><thead><tr><th>Driver</th><th class="r">Weight</th><th>Score</th><th>What the score means</th><th class="r">Points</th></tr></thead><tbody>${confTableHtml(R.conf,false)}</tbody></table><div class="verdict">${$("confVerdict").innerHTML}</div>`)}
   ${stageDoc(13,"Team shape: Year 1",tableOf("shapeRun")+`<div class="verdict">${esc($("shapeRunNote").textContent)}</div>`)}
   ${stageDoc(4,"Transformation capacity on top of the run team",`<div class="facts">${$("scFacts").innerHTML}</div>`)}
-  ${stageDoc(7,"Capacity ramp and savings",tableOf("termCalc")+`<div class="verdict">${$("termVerdict").innerHTML}</div>`+(R.pf.active?`<h3>AIOps use-case portfolio</h3><table><thead><tr><th>Use case</th><th>Level</th><th class="r">Build pw</th><th class="r">Deflection %</th><th>Live from</th><th class="r">Ramp mo</th></tr></thead><tbody>${R.pf.items.filter(i=>i.on).map(i=>`<tr><td>${esc(i.u.n)}</td><td>${i.u.tier}</td><td class="r">${i.u.effort}</td><td class="r">${i.c.defl}</td><td>Year ${i.startY}</td><td class="r">${i.c.ramp}</td></tr>`).join("")}</tbody></table>${tableOf("pfYears")}<h3>When each use case takes effect</h3>${tableOf("pfGrid")}<div class="verdict">${$("pfVerdict").innerHTML}</div>`:"")+(R.trans.ktW+R.trans.parW?`<h3>Transition (one-off, before service start)</h3><div class="working">${$("stepsTr").innerHTML}</div>`:""))}
+  ${stageDoc(7,"Capacity ramp and savings",tableOf("termCalc")+`<div class="verdict">${$("termVerdict").innerHTML}</div>`+(R.prod.on?`<h3>Productivity commitment</h3>${tableOf("prodTable")}<div class="verdict">${$("prodVerdict").innerHTML}</div>`:"")+(R.pf.active?`<h3>AIOps use-case portfolio</h3><table><thead><tr><th>Use case</th><th>Level</th><th class="r">Build pw</th><th class="r">Deflection %</th><th>Live from</th><th class="r">Ramp mo</th></tr></thead><tbody>${R.pf.items.filter(i=>i.on).map(i=>`<tr><td>${esc(i.u.n)}</td><td>${i.u.tier}</td><td class="r">${i.u.effort}</td><td class="r">${i.c.defl}</td><td>Year ${i.startY}</td><td class="r">${i.c.ramp}</td></tr>`).join("")}</tbody></table>${tableOf("pfYears")}<h3>When each use case takes effect</h3>${tableOf("pfGrid")}<div class="verdict">${$("pfVerdict").innerHTML}</div>`:"")+(R.trans.ktW+R.trans.parW?`<h3>Transition (one-off, before service start)</h3><div class="working">${$("stepsTr").innerHTML}</div>`:""))}
   ${stageDoc(14,"Team shape by year",tableOf("shapeY")+`<div class="verdict">${esc($("shapeYNote").textContent)}</div>`)}
   ${stageDoc(8,"Final fact check against the existing team",tableOf("exTable")+`<div class="verdict">${$("exVerdict").innerHTML}</div>`)}
   <section><h2>${PARTS_SHORT[4]} · Step ${STEPNO[10]} · Commercial position</h2>${R.fin.on?`<p class="verdict">The numbers above are the modelled ones. A proposed final number is applied: <b>Year 1 ${fmt(R.fin.total,2)} FTE</b> against ${fmt(R.total,2)} modelled. The client summary and the Excel workbook use it.</p>`:""}${commercialDoc()}</section>
@@ -4610,7 +4708,11 @@ document.addEventListener("input",e=>{
   if(t.id==="sparePct"){const v=+t.value;if(v>=0&&v<=80){S.sparePct=v;update()}return}
   if(d.tn){if(t.value===""){twr(t)[d.tn]=null;update()}else{const v=+t.value;if(v>=0){twr(t)[d.tn]=v;update()}}return}
   if(t.id==="pfFrom"){S.aiopsPf=pfOf();S.aiopsPf.from=+t.value;update();return}
-  if(d.ucf){const id=t.closest("tr").dataset.uc;S.aiopsPf=pfOf();const c=S.aiopsPf.uc[id];if(d.ucf==="on")c.on=t.checked;else c[d.ucf]=Math.max(0,+t.value||0);update();return}
+  if(t.id==="prodOn"){S.prod=Object.assign({},prodOf(),{on:t.checked});update();return}
+  if(t.id==="prodPct"){const v=parseFloat(t.value);if(!(v>=0))return;S.prod=Object.assign({},prodOf(),{pct:Math.min(30,v)});update();return}
+  if(t.id==="prodFrom"){S.prod=Object.assign({},prodOf(),{from:+t.value});update();return}
+  if(t.id==="prodBase"){const v=parseFloat(t.value);if(!(v>=0))return;S.prod=Object.assign({},prodOf(),{base:Math.min(15,v)});update();return}
+  if(d.ucf){const id=t.closest("tr").dataset.uc;S.aiopsPf=pfOf();const c=S.aiopsPf.uc[id];if(d.ucf==="on")c.on=t.checked;else if(d.ucf==="auto")c.auto=t.value;else c[d.ucf]=Math.max(0,+t.value||0);update();return}
   if(["pfReduce","pfRedeploy","pfCommit"].includes(t.id)){S.aiopsPf=pfOf();S.aiopsPf.realize[{pfReduce:"reduce",pfRedeploy:"redeploy",pfCommit:"commit"}[t.id]]=Math.max(0,Math.min(100,+t.value||0));update();return}
   if(d.tier){const tw=twr(t);tw.own={...ownOf(tw),[d.tier]:t.value};renderS2();update();return}
   if(d.tav){const tw=twr(t);tw.avail=t.value===""?null:+t.value;tw.slaTier="";t.closest(".tower").querySelectorAll("[data-tsla]").forEach(b=>b.setAttribute("aria-pressed","false"));update();return}
@@ -4755,6 +4857,7 @@ function summary(){
   L.push("","| Term | Y1 | Y2 | Y3 | Y4 | Y5 | FTE-years | Avg FTE/yr | vs 1-year |","|---|---|---|---|---|---|---|---|---|");
   R.termRows.forEach(t=>L.push(`| ${t.T} yr${t.T>1?"s":""}${t.T===R.term?" (selected)":""} | ${[0,1,2,3,4].map(i=>i<t.T?fmt(R.years[i].fte,1):"–").join(" | ")} | ${fmt(t.sum,1)} | ${fmt(t.avg,2)} | ${t.T===1?"–":"−"+fmt(t.vs1*100,1)+"%"} |`));
   L.push("",$("termVerdict").textContent);
+  if(R.prod.on)L.push("",$("prodVerdict").textContent);
   if(R.pf.active){L.push("","### AIOps use-case portfolio","","| Use case | Level | Build pw | Deflection % | Live from | Ramp mo |","|---|---|---|---|---|---|");R.pf.items.filter(i=>i.on).forEach(i=>L.push(`| ${i.u.n} | ${i.u.tier} | ${i.u.effort} | ${i.c.defl} | Year ${i.startY} | ${i.c.ramp} |`));L.push("","| Year | L2 defl. | L3 defl. | FTE freed | Reduced | Redeployed | Committed |","|---|---|---|---|---|---|---|");R.pf.years.forEach(v=>L.push(`| ${v.n} | ${fmt(v.dL2*100,1)}% | ${fmt(v.dL3*100,1)}% | ${fmt(v.gross,2)} | ${fmt(v.reduce,2)} | ${fmt(v.redeploy,2)} | ${fmt(v.commit,2)} |`));L.push("","**When each use case takes effect** (deflection in that year's team)","",`| Use case | Live from | ${R.pf.years.map(v=>"Year "+v.n).join(" | ")} |`,`|---|---|${R.pf.years.map(()=>"---").join("|")}|`);R.pf.items.filter(i=>i.on).forEach(i=>L.push(`| ${i.u.n} | Year ${i.startY} | ${R.pf.years.map(v=>v.uc[i.u.id]>0?fmt(v.uc[i.u.id]*100,1)+"%":"–").join(" | ")} |`));}
   if(R.trans.ktW+R.trans.parW){const T=R.trans;L.push("","### Transition (one-off, before service start)",`- Knowledge transfer ${T.ktW} weeks × ${fmt(T.ktP*100,0)}% of the Year 1 team: ${fmt(T.kt,1)} FTE-months`,`- Parallel run ${T.parW} weeks × full team: ${fmt(T.par,1)} FTE-months`,`- Transition management ${fmt(T.mgr,1)} FTE: ${fmt(T.mg,1)} FTE-months`,`- **Transition effort ${fmt(T.total,1)} FTE-months**, average ${fmt(T.avg,1)} FTE, peak ${fmt(T.peak,1)} FTE`);}
   {const Y=R.shapeY.years.slice(0,R.term);L.push("",`## ${PARTS_SHORT[3]} · Step ${STEPNO[14]} · Team shape by year (DAMO roles guidance map)`,"",`| Role | ${Y.map(y=>"Year "+y.n).join(" | ")} |`,`|---|${Y.map(()=>"---").join("|")}|`);

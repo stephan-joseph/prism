@@ -17,6 +17,8 @@ Values not taken from either source are marked `proposed`.
 - **User guide:** `guide.html` (https://damo-estimation-workflow.netlify.app/guide.html): an interactive walk-through of every stage with calculators that use the tool's formulas, short quizzes, a worked example (`docs/example-acme-retail.damo.json`, open it with Open file), FAQ and glossary. Progress is kept in the reader's browser. The tool's header links to it, and the guide's "Open Stage N" buttons deep-link into the tool with `index.html#stage=N`.
 - **Deploy:** Netlify project `damo-estimation-workflow` (https://damo-estimation-workflow.netlify.app), linked to this repository: every push to `claude/estimation-workflow-tool-fpuoqu` redeploys it. Netlify serves the repo root and the extraction functions (`netlify.toml`); `ANTHROPIC_API_KEY` and `INTAKE_PASSPHRASE` are set as secrets on the project, so the site is open to view but Extract inputs needs the passphrase (ask the project owner). See [Documents and AI extraction](#stage-0-documents-and-ai-extraction).
 
+**Step 2 warnings.** A tower that adds no FTE says why, on the tower card and in the working: no demand entered yet (answer ticket history, or the estate's structural size), we provide none of L1, L2 or L3, or its inputs add up to zero. When the base team from Step 1 is larger than the team the towers need, a note says that coverage sets the team and that towers change the total only once they pass it.
+
 ## Inputs start blank from step 2
 
 Step 1 opens with a working base-team example (24×5 laid out over India and Romania) so the coverage maths is visible at once. From step 2 onward nothing is pre-filled. The deal team supplies every input:
@@ -460,6 +462,15 @@ team(year n)    = max(floor, step 4 team − freed × (reduce % + commit %))
 ```
 
 Freed capacity splits into reduce / redeploy / commit (default 50 / 30 / 20; redeployed people stay on the team). The panel compares the result with the scenario YoY target, nets it against the AI engineers who build it, and flags when the build effort starting in a year exceeds the AI engineers' capacity (44 person-weeks each a year, `proposed`) or a prerequisite is missing. Token and inference cost is not modelled (FTE only).
+
+
+### Productivity commitment and agentic use cases
+
+New estimates start with a **productivity commitment**: a year-on-year reduction the estimate commits to the client, 12% from Year 2 by default (the framework's YoY targets are 10 to 20%; the figure is proposed and editable, with the start year). The year-by-year team follows the committed path, compounding on the Year 1 base and never going below the Step 1 coverage floor.
+
+The use cases are the evidence for it. Step 7 shows the **modelled** team (use cases plus a proposed 3% a year of baseline productivity outside them; with the scenario percentage method, that percentage already includes it) beside the **committed** team, the **gap** in FTE and how much of the committed reduction is **supported**. A positive gap is delivery risk the estimate carries, and the verdict says how many FTE-years of it fall in the term and how to close it. The commitment can be switched off, in which case the team follows the model as before. Estimates saved before this change keep their own method: no commitment and no agentic use cases.
+
+The catalogue now includes six **agentic** use cases (ticket triage and resolution, root-cause analysis with action proposals, remediation with approval, runbook and change execution, data-quality exception handling, knowledge curation). Each has an **autonomy level**: assist (counts half the deflection, less build), act with approval (the default, 80%) or autonomous (all of it, 30% more build). They come in waves after the assistive use cases (one or two years after the "all use cases go live from" year) unless you set a start year on the use case. Catalogue, deflection, autonomy factors and baseline productivity are proposed values.
 
 ### Transition (optional)
 
