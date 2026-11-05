@@ -1238,6 +1238,10 @@ tr.sel td{background:var(--accent-soft)}
         <label class="inline" for="pfFrom">All use cases go live from <select id="pfFrom"><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option><option value="5">Year 5</option><option value="0">The scenario's own timeline</option></select></label>
         <div class="hint">Year 1 is the default. Set a different year for any use case in the table; it overrides this.</div>
       </div>
+      <div class="field" style="margin-bottom:10px">
+        <label class="inline" for="aiBuildOnly"><input type="checkbox" id="aiBuildOnly"> AI engineers build only: they leave the team after the last build year</label>
+        <div class="hint" id="aiBuildHint"></div>
+      </div>
       <div class="loc-table"><table>
         <thead><tr><th>On</th><th>Use case</th><th>Level</th><th class="r">Build, person-weeks</th><th class="r">Deflection %</th><th>Live from</th><th class="r">Ramp, months</th><th>Autonomy (agentic)</th></tr></thead>
         <tbody id="pfTable"></tbody>
@@ -1336,7 +1340,7 @@ tr.sel td{background:var(--accent-soft)}
     <div class="stage-head">
       <span class="eyebrow"></span>
       <h2 id="s14h">Team shape by year</h2>
-      <p>The indicative shape of the team for every year of the term, after the capacity ramp. Year 1 is the full team; later years scale every role with that year's team, except the AI engineers (AIOps), who stay to build and run the use cases. It is a planning aid for the pricing sheet and the delivery plan, not a roster.</p>
+      <p>The indicative shape of the team for every year of the term, after the capacity ramp. Year 1 is the full team; later years scale every role with that year's team, except the AI engineers (AIOps), who stay through the build years and, with "build only" on in Step 11, leave after the last one. It is a planning aid for the pricing sheet and the delivery plan, not a roster.</p>
     </div>
     <div class="panel">
       <header><h3>Team by role and year</h3><span class="sub">DAMO roles guidance map · FTE</span></header>
@@ -1871,7 +1875,7 @@ function defaults(){
 }
 function defaultsRaw(){
   return {
-    aiopsPf:{mode:"portfolio",from:1},
+    aiopsPf:{mode:"portfolio",from:1},aiBuildOnly:true,
     deal:"",active:0,
     region:"eu",custLoc:"c_uk",days:5,hours:24,start:0,tz:0,fteHours:40,util1:85,minSenior:1,weekendMode:"active",support:"active",prod:{on:true,pct:12,from:2,base:3},oncall1:15,ocMode:"flat",p1PerMonth:null,p1Hours:3,standby:10,
     perShift:{L2:1,L3:1},
@@ -2021,6 +2025,7 @@ function migrate(p){
       migrateCoverage(st,p);
       /* estimates saved before the support model was an input: read it from the windows they already have */
       /* estimates saved before the productivity commitment keep their own method: no commitment line, and no agentic use cases switched on */
+      st.aiBuildOnly=p.aiBuildOnly===true;   /* estimates saved before this setting keep the AI engineers for the whole term */
       st.prod=p.prod&&typeof p.prod==="object"?Object.assign({on:true,pct:12,from:2,base:3},p.prod):{on:false,pct:12,from:2,base:0};
       if(st.aiopsPf&&st.aiopsPf.uc)["agt","agr","agm","age","agq","agk"].forEach(id=>{if(!st.aiopsPf.uc[id])st.aiopsPf.uc[id]={on:false}});
       if(p.support!=="active"&&p.support!=="passive")st.support=st.locations.some(l=>(l.win||[]).some(w=>w.m==="oncall"))?"passive":"active";
@@ -2319,7 +2324,12 @@ function compute(){
   const savePct=S.savePct==null?SAVE_BY_SC[sc]*pathMul:+S.savePct;
   const r7=savePct/100;
   const cont2=S.cont2==null?Math.min(contPct,6):+S.cont2;
-  const floor=S.protectFloor!==false?Math.min(s1,sub5):0;
+  /* AI engineers build only (proposed): they stay through the last year in which a use case starts building, then leave the year's team.
+     The savings path runs on the rest of the team (nonAI); the AI part (their FTE plus the SDM share that follows them) is added back for the build years */
+  const aiBO=S.aiBuildOnly===true&&ai2>0;
+  const aiPart=aiBO?ai2*(1+(1+rp5)/sdmRatio):0;
+  const nonAI=sub5-aiPart;
+  const floor=S.protectFloor!==false?Math.min(s1,nonAI):0;
   const rp7=riskPctOf("s7");
   /* AIOps use-case portfolio: deflection on the L2/L3 effort of towers with AIOps in scope, combined per tier
      (1 − Π(1 − share)), capped by the tower ceiling. The team for year n is set from the deflection reached by the
@@ -2346,8 +2356,10 @@ function compute(){
      committed path, kept above the coverage floor; the gap is what the model does not support */
   const PR=prodOf();
   /* with the use-case method, baseline productivity (runbooks, automation, learning curve outside the use cases) compounds on top of the use-case savings; the scenario percentage already includes it */
-  const modelled=n=>{const py=pfYears[n-1];if(!pfMode)return floor+(sub5-floor)*Math.pow(1-r7,n-1);const x=Math.max(floor,sub5-py.reduce-py.commit);return floor+(x-floor)*Math.pow(1-PR.base/100,n-1)};
-  const committed=n=>PR.on&&n>=PR.from?Math.max(floor,sub5*Math.pow(1-PR.pct/100,n-PR.from+1)):sub5;
+  const aiEnd=Math.min(5,Math.max(1,...pfItems.filter(i=>i.on).map(i=>i.startY)));
+  const aiAt=n=>aiBO&&n>aiEnd?0:aiPart;
+  const modelled=n=>{const py=pfYears[n-1];if(!pfMode)return floor+(nonAI-floor)*Math.pow(1-r7,n-1)+aiAt(n);const x=Math.max(floor,nonAI-py.reduce-py.commit);return floor+(x-floor)*Math.pow(1-PR.base/100,n-1)+aiAt(n)};
+  const committed=n=>PR.on&&n>=PR.from?Math.max(floor,nonAI*Math.pow(1-PR.pct/100,n-PR.from+1))+aiAt(n):nonAI+aiAt(n);
   const years=[1,2,3,4,5].map(n=>{
     const mB=modelled(n), cB=committed(n), base=PR.on?cB:mB;
     const c=(n===1?contPct:cont2)/100*(1+rp6);
@@ -2491,7 +2503,7 @@ function compute(){
     volShare,volAvail,sc,SC,transPct,transAuto,stageMul,appMul,pathMul,pod,autoRatio,ratio:aiRatioN,aiops,stage4raw,otherTrans,rp4,s4,risk4Add:s4-stage4raw,
     sub4,sdmRatio,sdmRaw,rp5,s5,risk5Add:s5-sdmRaw,sdmLoc,
     sub5,CX,contPct,contRaw,rp6,s6,risk6Add:s6-contRaw,pyr,shares,
-    savePct,cont2,floor,rp7,years,prod:PR,termRows,term,pf:{mode:PF.mode,active:pfMode,from:PF.from,items:pfItems,years:pfYears,tierFte,ceiling,aiFrom,capacity:ai2*BUILD_PW,realize:PF.realize},
+    savePct,cont2,floor,rp7,years,aiBO,aiEnd,aiPart,prod:PR,termRows,term,pf:{mode:PF.mode,active:pfMode,from:PF.from,items:pfItems,years:pfYears,tierFte,ceiling,aiFrom,capacity:ai2*BUILD_PW,realize:PF.realize},
     total,people,roundAdd:people-total,roles,trans,fin,
     snaps,L2:sum(locs,"c2"),L3:sum(locs,"c3"),G:sum(locs,"g"),L2p:sum(locs,"p2"),L3p:sum(locs,"p3"),Gp:sum(locs,"pg")};
 }
@@ -2884,7 +2896,21 @@ function runSelfTests(){
     add("DMS is staffed with Data Ops Engineer; Data Engineer is a special role","Data Ops Engineer present and Data Engineer 0.50",`DOP ${fmt((id("dop")||{fte:0}).fte,2)}, DE ${fmt((id("de")||{fte:0}).fte,2)}`,id("dop")&&id("de")&&Math.abs(id("de").fte-0.5)<0.1,"agreed");
     add("AMS is staffed with System Support Engineer; Developer is a special role; the SDM is the Service Delivery Manager","Developer 0.80 and SDM rows present",`Dev ${fmt((id("dev")||{fte:0}).fte,2)}, SDM ${fmt((id("sdm")||{fte:0}).fte,2)}`,id("dev")&&Math.abs(id("dev").fte-0.8)<0.15&&id("sdm")&&Math.abs(id("sdm").fte-R.s5)<1e-9,"proposed");
     const aie=sy.years.map(y=>y.by.aio);
-    add("AI engineers stay constant through the term while the rest of the team scales","same AI engineer FTE in every year",aie.map(v=>fmt(v,2)).join(" / "),aie.every(v=>Math.abs(v-aie[0])<1e-9)&&aie[0]>0,"proposed")});
+    add("With build-only on and the default use cases, the AI engineers stay through the build years and are gone after","AIOps Engineer row is level to the last build year, then drops by the AI FTE",`${R.aiBO?"on":"off"}, build through Year ${R.aiEnd}; ${aie.map(v=>fmt(v,2)).join(" / ")}`,R.aiBO&&R.aiEnd===3&&aie.slice(0,3).every(v=>v>=R.ai2-1e-9)&&aie.slice(3).every(v=>v<R.ai2-1e-9)&&aie[0]>0,"proposed")});
+  {const asst=st=>{st.aiopsPf=pfDefaults();st.aiopsPf.from=1;USECASES.filter(u=>u.kind==="agentic").forEach(u=>st.aiopsPf.uc[u.id].on=false)};
+   const fx=on=>testState(st=>{st.towers=[amsTower(300,{aiops:true,l15:true,l15Fte:0.5})];st.aiBuildOnly=on;asst(st)});
+   withState(fx(false),R=>{const sy=shapeYears(R),aie=sy.years.map(y=>y.by.aio),ok=sy.years.every(y=>Math.abs(Object.values(y.by).reduce((x,v)=>x+v,0)-y.total)<1e-9);
+     add("With build-only off the AI engineers stay constant through the term","same AI engineer FTE in every year, rows add up",aie.map(v=>fmt(v,2)).join(" / "),!R.aiBO&&ok&&aie[0]>0&&sy.base.fixed>0&&sy.years.every(y=>y.by.aio>=sy.base.fixed-1e-9),"proposed")});
+   const on=withState(fx(true),R=>({y:R.years.map(v=>v.fte),aiPart:R.aiPart,end:R.aiEnd,ai2:R.ai2,sy:shapeYears(R),sub5:R.sub5,tot:R.total}));
+   const off=withState(fx(false),R=>({y:R.years.map(v=>v.fte)}));
+   add("Build-only leaves Year 1 unchanged and lowers every later year by about the AI engineers","Year 1 equal; Years 2 to 5 lower by up to the AI part",`Y1 ${fmt(on.y[0],2)} vs ${fmt(off.y[0],2)}; Y2 ${fmt(on.y[1],2)} vs ${fmt(off.y[1],2)}`,Math.abs(on.y[0]-off.y[0])<1e-9&&on.y.slice(1).every((v,i)=>v<off.y[i+1]-1e-9&&v>=off.y[i+1]-on.aiPart*1.3),"proposed");
+   add("Build-only roles add up to the year total in every year and the AI row is zero after the build","sum of roles = total; AI part 0 after the build year",on.sy.years.map(y=>fmt(Object.values(y.by).reduce((x,v)=>x+v,0)-y.total,6)).join(" "),on.sy.years.every(y=>Math.abs(Object.values(y.by).reduce((x,v)=>x+v,0)-y.total)<1e-9),"proposed")}
+  {const wave=withState(testState(st=>{st.towers=[amsTower(300,{aiops:true})];st.aiBuildOnly=true;st.aiopsPf=pfDefaults();st.aiopsPf.from=1}),R=>R.aiEnd);
+   const none=withState(testState(st=>{st.towers=[amsTower(300,{aiops:true})];st.aiBuildOnly=true;st.aiopsPf=pfDefaults();st.aiopsPf.from=1;Object.keys(st.aiopsPf.uc).forEach(k=>st.aiopsPf.uc[k].on=false)}),R=>R.aiEnd);
+   const late=withState(testState(st=>{st.towers=[amsTower(300,{aiops:true})];st.aiBuildOnly=true;st.aiopsPf=pfDefaults();st.aiopsPf.from=1;st.aiopsPf.uc.agm.on=true;st.aiopsPf.uc.agm.start=4}),R=>R.aiEnd);
+   add("The build end is the last year a switched-on use case starts: agentic waves count, none on means Year 1","default 3 (wave 2 starts in Year 3), none 1, a use case set to Year 4 gives 4",`${wave}, ${none}, ${late}`,wave===3&&none===1&&late===4,"proposed")}
+  {const old=migrate({deal:"Old",towers:[]}), cur=migrate(Object.assign({deal:"New",towers:[]},{aiBuildOnly:true}));
+   add("An estimate saved before build-only keeps the AI engineers for the whole term; a new one starts with build-only on","old off, new on, fresh default on",`old ${old.aiBuildOnly}, saved-new ${cur.aiBuildOnly}, fresh ${defaults().aiBuildOnly}`,old.aiBuildOnly===false&&cur.aiBuildOnly===true&&defaults().aiBuildOnly===true,"agreed")}
   withState(testState(st=>{st.towers=[amsTower(300,{skills:[mkSkill("sse",100)]})]}),R=>{const sf=shapeOf(R.roles,R), has=i=>sf.rows.some(r=>r.id===i);add("Roles appear only where they are in scope: no Product Support Engineer, SRE or AI Engineer unless L1.5, SRE or AIOps is answered Yes","only System Support Engineer and SDM",sf.rows.map(r=>r.id).join(", "),!has("pse")&&!has("sre")&&!has("aie")&&has("sse"),"proposed")});
   withState(testState(st=>{st.towers=[amsTower(300,{aiops:true,l15:true,l15Fte:0.5,sre:true,sreFte:0.4,skills:[mkSkill("sse",100)]})]}),R=>{const sf=shapeOf(R.roles,R), g=i=>(sf.rows.find(r=>r.id===i)||{fte:0}).fte, t=R.towers[0];add("L1.5, SRE and AIOps in scope bring in their roles, sized by the FTE typed","PSE 0.50, SRE 0.40 and the AIOps Engineer present",`PSE ${fmt(g("pse"),2)}, SRE ${fmt(g("sre"),2)}, AIOps ${fmt(g("aio"),2)}; tower L3 ${fmt(t.fte3,2)}`,g("pse")>0&&g("aio")>0&&Math.abs(g("pse")-0.5)<1e-9&&Math.abs(g("sre")-0.4)<1e-9,"proposed")});
   {const base=withState(testState(st=>{st.towers=[amsTower(300,{skills:[mkSkill("sse",100)]})]}),R=>R.total);
@@ -3484,10 +3510,11 @@ function shapeOf(list,X){
   const rows=GROLES.filter(r=>(g[r[0]]||0)>1e-9).map(r=>({id:r[0],name:r[1],desc:r[2],guide:r[3],kind:r[4],fte:g[r[0]],share:total>0?g[r[0]]/total:0}));
   return {rows,total,fixed,capped:k<1,carved:core>0?ask*k:0};
 }
-/* Year 1 of the final team, then the later years: every role scales with the year's team, except AI engineers, who stay to build the use cases */
+/* Year 1 of the final team, then the later years: every role scales with the year's team, except AI engineers, who stay to build the use cases.
+   With "build only" on they leave after the last build year and the other roles scale to the year's whole team. */
 function shapeYears(X){
   const b=shapeOf(X.roles,X), y1=X.years[0].fte, den=y1-b.fixed;
-  const years=X.years.map(y=>{const f=den>0?(y.fte-b.fixed)/den:1;return {n:y.n,total:y.fte,by:Object.fromEntries(b.rows.map(r=>[r.id,r.id==="aio"?(r.fte-b.fixed)*f+b.fixed:r.fte*f]))}});
+  const years=X.years.map(y=>{const fx=X.aiBO&&y.n>X.aiEnd?0:b.fixed, f=den>0?(y.fte-fx)/den:1;return {n:y.n,total:y.fte,by:Object.fromEntries(b.rows.map(r=>[r.id,r.id==="aio"?(r.fte-b.fixed)*f+fx:r.fte*f]))}});
   return {base:b,years};
 }
 /* The run team: the same engine with no transformation POD and no AI engineers. Stage 2 qualifies this team; Stage 3 adds the transformation capacity on top. */
@@ -4026,6 +4053,7 @@ function updateS7(){
   document.querySelectorAll("[data-pfm]").forEach(b=>b.setAttribute("aria-pressed",String(P.mode===b.dataset.pfm)));
   $("saveField").hidden=pfm;$("pfPanel").hidden=!pfSel;
   if($("pfFrom"))$("pfFrom").value=String(P.from);
+  if($("aiBuildOnly")){$("aiBuildOnly").checked=S.aiBuildOnly===true;$("aiBuildHint").textContent=R.ai2>0?(S.aiBuildOnly===true?`AI engineers (${fmt(R.ai2,2)} FTE in Year 1) stay through Year ${R.aiEnd}, the last year a switched-on use case starts building, and are not in the team after that. This assumes the support team runs and tunes the use cases (proposed).`:`AI engineers (${fmt(R.ai2,2)} FTE in Year 1) stay in the team for the whole term, as the old method did. Tick this to take them out after the build.`):"No tower has AIOps in scope, so there are no AI engineers."}
   document.querySelectorAll('#pfTable [data-ucf="start"]').forEach(sel=>{const o=sel.options[0],u=USECASES.find(x=>x.id===sel.closest("tr").dataset.uc);if(o)o.textContent=`Same as all (Year ${P.aiFrom+((u&&u.wave)||0)})`});
   $("pfmHint").textContent=pfm?"Savings come from the use cases the AI engineers build (panel below).":pfSel?`No tower has AIOps in scope, so the scenario percentage (${R.savePct}% a year) is used for now. Turn AIOps on for a tower in Step 2 to use the use cases.`:`A flat ${R.savePct}% a year from Year 2 (Scenario ${R.sc} target ${R.SC.savings}), whether or not AIOps is in scope.`;
   if(pfSel){
@@ -4536,7 +4564,8 @@ function toggleFresh(){
   updateFreshLabel();
   toast(on?"On. Opening Prism from its address starts a new estimate; reloading the page keeps the one on screen. Use Save file to keep work.":"Off. Prism continues the last estimate when you open it.");
 }
-const LIBRARY_URL="https://prism-library-beta.netlify.app";
+let LIBRARY_URL="https://prism-library-beta.netlify.app";   /* default; a server can override it with the LIBRARY_URL setting, read once at load so the pop-up is not blocked */
+fetch("/library-config.json",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(j=>{if(j&&typeof j.url==="string"&&/^https?:\/\//.test(j.url))LIBRARY_URL=j.url.replace(/\/+$/,"")}).catch(()=>{});
 function encodeHandoff(obj){
   const bytes=new TextEncoder().encode(JSON.stringify(obj));let bin="";bytes.forEach(c=>{bin+=String.fromCharCode(c)});
   return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
@@ -4707,6 +4736,7 @@ document.addEventListener("input",e=>{
   if(d.cmx){const [sid,bid]=pair(d.cmx);covPut(covOf(sid),bid,t.value===""?0:+t.value);update();return}
   if(t.id==="sparePct"){const v=+t.value;if(v>=0&&v<=80){S.sparePct=v;update()}return}
   if(d.tn){if(t.value===""){twr(t)[d.tn]=null;update()}else{const v=+t.value;if(v>=0){twr(t)[d.tn]=v;update()}}return}
+  if(t.id==="aiBuildOnly"){S.aiBuildOnly=t.checked;update();return}
   if(t.id==="pfFrom"){S.aiopsPf=pfOf();S.aiopsPf.from=+t.value;update();return}
   if(t.id==="prodOn"){S.prod=Object.assign({},prodOf(),{on:t.checked});update();return}
   if(t.id==="prodPct"){const v=parseFloat(t.value);if(!(v>=0))return;S.prod=Object.assign({},prodOf(),{pct:Math.min(30,v)});update();return}

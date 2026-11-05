@@ -48,6 +48,7 @@ export const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
     if (url.pathname === "/healthz") { res.writeHead(200); return res.end("ok"); }
+    if (url.pathname === "/library-config.json") { res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }); return res.end(JSON.stringify({ url: process.env.LIBRARY_URL || "" })); }
     const route = routes[url.pathname];
     if (route) {
       if (req.method !== route[0]) { res.writeHead(405, { Allow: route[0] }); return res.end(); }

@@ -33,7 +33,7 @@ Open `index.html` in a browser for the calculators. Extraction needs it served o
 python3 -m http.server 8000
 ```
 
-Self-tests (the engine's checks against the framework's worked examples, plus invariants and feature tests). Expect every test to pass; the count was 111 at handoff.
+Self-tests (the engine's checks against the framework's worked examples, plus invariants and feature tests). Expect every test to pass; the count was 116 after the build-only change.
 
 ```bash
 python3 scripts/run-selftests.py
@@ -75,7 +75,7 @@ Values marked `proposed` in the tool are not from the framework. Do not present 
 ## Decisions worth knowing
 
 - Roles follow the DAMO roles guidance map. Each tower has one default role; everything else is a typed special role. SRE and Product Support Engineer are typed FTE per tower.
-- AIOps savings default to the use-case method from Year 1. AI engineers are fixed across years. Realisation split is 50% reduce, 30% redeploy, 20% commit.
+- AIOps savings default to the use-case method from Year 1. AI engineers are in the team through the last build year (the last year a switched-on use case starts), then leave it; run and tune is assumed to sit in the support team (`S.aiBuildOnly`, proposed). Estimates saved before the setting keep them for the whole term. Realisation split is 50% reduce, 30% redeploy, 20% commit.
 - The productivity commitment is a commercial position, labelled proposed. 10 to 15% a year is the owner's intent; 12% is the default. Five years at 12% is a 40% cut, which the model's use cases do not fully support, and the tool shows that gap.
 - Agentic autonomy factors (assist 0.5, act with approval 0.8, autonomous 1.0 of deflection; build effort 0.8, 1.0, 1.3) and 3% baseline productivity are proposed.
 - The extraction function logs usage but never stores document text.

@@ -465,6 +465,10 @@ team(year n)    = max(floor, step 4 team − freed × (reduce % + commit %))
 Freed capacity splits into reduce / redeploy / commit (default 50 / 30 / 20; redeployed people stay on the team). The panel compares the result with the scenario YoY target, nets it against the AI engineers who build it, and flags when the build effort starting in a year exceeds the AI engineers' capacity (44 person-weeks each a year, `proposed`) or a prerequisite is missing. Token and inference cost is not modelled (FTE only).
 
 
+### AI engineers build only
+
+With **AI engineers build only** on (Step 11, default for new estimates, `proposed`), the AI engineers are in the team through the **last build year** and not after. The build end is the last year in which a switched-on use case starts building (its live-from year plus its wave; at least Year 1, at most Year 5). With the default use cases the agentic ones start in Year 3, so the AI engineers stay through Year 3. The savings path and the productivity commitment run on the team without them. Their FTE and the SDM share that follows them are added back for the build years. Year 1 does not change. The role view (Step 12) drops the AI part of the AIOps Engineer row after the build end. This assumes the support team runs and tunes the use cases afterwards, which is a commercial position to confirm. Estimates saved before the setting keep the AI engineers for the whole term; tick the box in Step 11 to switch one over.
+
 ### Productivity commitment and agentic use cases
 
 New estimates start with a **productivity commitment**: a year-on-year reduction the estimate commits to the client, 12% from Year 2 by default (the framework's YoY targets are 10 to 20%; the figure is proposed and editable, with the start year). The year-by-year team follows the committed path, compounding on the Year 1 base and never going below the Step 1 coverage floor.
