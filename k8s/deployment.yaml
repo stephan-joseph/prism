@@ -35,12 +35,12 @@ spec:
             - name: ANTHROPIC_BASE_URL
               value: https://api.thoughtworks.polis.thoughtworks-labs.net
             - name: EXTRACTION_MODEL
+            - name: LIBRARY_URL
+              value: http://prism-library.prism-library.svc.cluster.local
               value: claude-sonnet-5-5
             - name: INTAKE_PASSPHRASE
               valueFrom: {secretKeyRef: {name: prism-secrets, key: INTAKE_PASSPHRASE, optional: true}}
             # Address of the Prism Library service, used by File, Add to Prism Library. Set it to the Library's address in this cluster.
-            - name: LIBRARY_URL
-              value: http://ae8cff7cf27bf4ac8aeac3982d1a52aa-348236912.ap-southeast-1.elb.amazonaws.com
             - name: USAGE_ADMIN_KEY
               valueFrom: {secretKeyRef: {name: prism-secrets, key: USAGE_ADMIN_KEY, optional: true}}
           volumeMounts:
