@@ -37,8 +37,8 @@ spec:
             - name: EXTRACTION_MODEL
               value: claude-sonnet-5-5
             - name: LIBRARY_URL
-              value: http://prism-library.prism-library.svc.cluster.local
-              value: http://prism-library.prism-library.svc.cluster.local
+              value: http://aa6589d14883b4e6d8b13f75882fb014-1672564425.ap-southeast-1.elb.amazonaws.com
+              value: http://aa6589d14883b4e6d8b13f75882fb014-1672564425.ap-southeast-1.elb.amazonaws.com
             - name: INTAKE_PASSPHRASE
               valueFrom: {secretKeyRef: {name: prism-secrets, key: INTAKE_PASSPHRASE, optional: true}}
             # Address of the Prism Library service, used by File, Add to Prism Library. Set it to the Library's address in this cluster.
