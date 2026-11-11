@@ -213,6 +213,7 @@ const CH=[
 <thead><tr><th>#</th><th>Step</th><th>What you decide</th></tr></thead>
 <tbody>
 <tr><td>0</td><td>Documents</td><td>Upload RFP, incident dump, notes; Claude proposes inputs (optional)</td></tr>
+<tr><td>0</td><td>Contract clauses</td><td>List the clauses that size the team and link each to the towers that serve it (optional). It explains the number and never changes it</td></tr>
 <tr><td colspan="3"><b>Stage 1 · Size the team</b></td></tr>
 <tr><td>1</td><td>Coverage</td><td>Support window, customer time zone, each location's working and on-call windows, people on duty</td></tr>
 <tr><td>2</td><td>Service towers</td><td>Towers, who provides L1/L2/L3, SLAs, and per tower: volumetrics or thin slices</td></tr>
@@ -269,7 +270,7 @@ quiz:[
 <li><div>Review <span class="ui">Proposed inputs</span>, grouped by stage. Untick anything you don't agree with, then <span class="ui">Apply selected and go to Step 1</span>.</div></li>
 </ol>
 <h2>What Claude can propose</h2>
-<p>Deal name; coverage window and P1s a month; towers with who provides L1/L2/L3, SLAs, priority mix, ticket volumes (and where they're counted) or estate size, enhancements, L1.5, SRE and AIOps scope, special roles; AI adoption; complexity; term; existing team; assumptions, risks and open questions for the client.</p>
+<p>Deal name; coverage window and P1s a month; towers with who provides L1/L2/L3, SLAs, priority mix, ticket volumes (and where they're counted) or estate size, enhancements, L1.5, SRE and AIOps scope, special roles; AI adoption; complexity; term; existing team; contract clauses and the towers that serve them; assumptions, risks and open questions for the client.</p>
 <div class="note"><b>Where the inputs came from</b> Every applied input keeps its source and quote. It shows under the coverage window, on each tower card, and in Step 13's <span class="ui">Where the inputs came from</span> table. If someone edits it later it's flagged <i>edited since</i>.</div>
 <div class="warn"><b>Always check the proposals</b> Claude only proposes what the documents support, but it can misread a table. Applied risks arrive switched off at 0%, and open questions become Step 1 assumptions to confirm with the client.</div>
 ${tryTool(0,"Drop in an RFP and see what it proposes.")}
@@ -278,6 +279,31 @@ quiz:[
  {q:"What happens to the raw incident export?",o:["It's uploaded to Claude as-is","It's summarised in your browser; only the summary is sent","It's stored on the server"],a:1,why:"The browser computes monthly volumes, priority mix and top groups, and sends only that summary."},
  {q:"You apply a proposed risk from the documents. What FTE effect does it have?",o:["Its suggested % immediately","None until you switch it on and set a %","It doubles the contingency"],a:1,why:"Imported risks arrive switched off at 0%, so the deal team decides the modifier."}
 ]},
+
+{id:"clauses",grp:"Start here",t:"Contract clauses",html:()=>`
+<span class="eyebrow">Optional · between Step 0 and Step 1</span>
+<h1>Trace the team back to the contract</h1>
+<p class="lead">A reviewer or client often asks why a role is in the team. This screen lets you answer in contract terms: list the clauses that decide the size or scope of the run team, link each to the towers that serve it, and read how much of the Year 1 team each clause accounts for.</p>
+<div class="note"><b>It explains the number. It never changes it.</b> Clauses group the team that Stages 1 to 3 already built. Adding, editing or removing a clause leaves every FTE as it was.</div>
+<h2>How to use it</h2>
+<ol class="steps">
+<li><div>Open <span class="ui">Contract clauses</span> from the Documents screen (<span class="ui">Next: contract clauses</span>). The screen is optional; you can skip it with <span class="ui">Skip to step 1</span>.</div></li>
+<li><div>Click <span class="ui">+ Add a clause</span> and fill in the <b>reference</b> (for example "2.1"), <b>What it requires</b> and <b>Target or SLA</b>. You can add up to 25.</div></li>
+<li><div>Or let Claude propose them. <span class="ui">Extract inputs</span> on the Documents screen returns clauses with the quote each came from, and the clause references each tower serves. They appear in the proposals list. Untick any you don't agree with. After you apply them, the Clauses screen opens so you can check the links.</div></li>
+<li><div><b>Link each clause to its towers</b> by ticking them on this screen. Step 2 has the same choice on every tower under <span class="ui">Contract clauses served</span>. A tower can serve several clauses. A clause with no tower is flagged as not linked, and no FTE is tied to it.</div></li>
+<li><div>Go to <b>Step 9, Team shape: Year 1</b>. The <b>FTE by contract clause</b> table splits each tower's Year 1 FTE equally across the clauses it is linked to.</div></li>
+</ol>
+<h2>Reading the table</h2>
+<div class="tbl"><table><thead><tr><th>Row</th><th>What it means</th></tr></thead><tbody>
+<tr><td>A clause</td><td>The FTE of the towers linked to it, shared equally where a tower serves more than one clause</td></tr>
+<tr><td>Shared roles</td><td>Roles that belong to no single tower: shift cover, transformation capacity, delivery managers</td></tr>
+<tr><td>Not linked to a clause</td><td>A tower you have not linked to any clause yet</td></tr>
+<tr><td>Tie-out check</td><td>Confirms the rows add up to the Year 1 team. If they don't, it shows an error</td></tr>
+</tbody></table></div>
+<div class="warn"><b>Limits to know</b> The split is equal, so it is a way to explain the team, not a price per clause. The last year of the term is shown as an approximation: the tool keeps FTE by tower for Year 1 only, so it applies the Year 1 split to that year's team. A proposed final number from Step 14 is not split by clause.</div>
+<h2>Where clauses appear</h2>
+<p>They are saved in the estimate file, in the Excel export (a <b>Contract clauses</b> sheet) and in both summaries. Estimates saved before this screen existed open with no clauses.</p>
+<div class="tip"><b>Links are never guessed</b> Extraction links a tower only to a clause reference that exists in the list. If a link is missing, tick it yourself.</div>`},
 
 {id:"s1",grp:"Stage 1 · Size the team",t:"Step 1 · Coverage",html:()=>`
 <span class="eyebrow">Stage 1 · Step 1</span>
@@ -331,6 +357,7 @@ quiz:[
 <li><div><b>L1.5, SRE and AIOps</b>: each tower asks whether they are in scope. SRE (any tower kind): you type the SRE FTE, carved out of that tower's L3, a role-mix change, not extra headcount. L1.5: you type the Product Support Engineer FTE, carved out of that tower's L2.  AIOps brings the AI engineers.</div></li>
 <li><div><b>Special roles</b> are not entered on the tower: they live in Step 5 (Skill type), together with the skills required on each shift.</div></li>
 <li><div><b>AIOps</b>: if in scope, AI engineers are added at 1 per 4 support FTE (low AI adoption) or 1 per 8 (moderate; 1:6 above 20 FTE). They are counted in Stage 3 as transformation capacity, inside the POD.</div></li>
+<li><div><b>Contract clauses served</b> (optional): tick the clauses this tower serves. This only feeds the by-clause table in Step 9 and never changes the tower's FTE. See <b>Contract clauses</b>.</div></li>
 <li><div><b>Default role</b>: every tower has one and it takes the tower's FTE: System Support Engineer for AMS, Infra Support Engineer for IMS, Data Ops Engineer for DMS, AIOps Engineer for agentic (AI platform). The base roster covers it on every shift.</div></li>
 </ol>
 <div class="flow"><span>Tickets a month</span><i>→</i><span>L1 30% resolved · L2 70% · L3 = L2 × 20%</span><i>→</i><span>hours: L1 0.25 · L2 3 · L3 10, + SLA, + coordination</span><i>→</i><span>÷ 85% utilisation</span><i>→</i><span>+ B non-ticketing 25/35%</span><i>→</i><span>÷ 160 h = FTE</span></div>
@@ -457,6 +484,7 @@ quiz:[
 <li><div>Each tower has <b>one default role</b>: <b>AMS</b> System Support Engineer; <b>IMS</b> Infra Support Engineer; <b>DMS</b> Data Ops Engineer; <b>agentic (AI platform)</b> AIOps Engineer (also the AI engineers where AIOps is in scope). Developer, Infra Engineer, Data Engineer and AI/ML Engineer appear only as special roles you type on a tower, carved out of its L3. Mobile Developer, Quality Analyst, Business Analyst and an extra Solution Architect are special roles added on top.</div></li>
 <li><div>The <b>Solution Architect</b> is 10% of an FTE once per deal (0.8 hours of an 8-hour day), editable here, carved out of the core-stream roles (capped at 60% of them), so the total never changes.</div></li>
 <li><div><b>Roles appear only where they are in scope, sized by what you type</b>: the Product Support Engineer FTE on a tower with L1.5 in scope (carved out of its L2), the SRE FTE on a tower with SRE in scope (carved out of its L3), the AI Engineer where AIOps is in scope. A Yes with no FTE typed shows no role. The transformation POD's automation and CI/CD work is its own Transformation engineers row. Quality Analyst, Business Analyst, Solution Architect and Mobile Developer come from the <b>Special roles</b> you add in Step 5.</div></li>
+<li><div>If you listed contract clauses, the <b>FTE by contract clause</b> table shows how much of the Year 1 team each clause accounts for, with a tie-out check. It groups the same FTE and never changes it.</div></li>
 </ol>
 <div class="note"><b>The Year 1 column moves with Stage 3</b> It includes the AI engineers (AIOps) and the rest of the transformation capacity, so it changes as you answer Step 10. The Service Delivery Manager follows the ratio in Step 7 (default 1 per 12 FTE, as in the map).</div>
 ${tryTool(13,"Review the Year 1 team by role.")}`},
@@ -551,7 +579,7 @@ ${tryTool(10,"Set a proposed Year 1 team and read the risks and the commercial o
 <div class="tbl"><table><thead><tr><th>Output</th><th>For</th><th>What's in it</th></tr></thead><tbody>
 <tr><td><span class="ui">Download summary</span></td><td>Deal review, deal desk</td><td>Every stage's working, allowances, deviations, confidence, sources, scenarios, checks, assumptions and risks</td></tr>
 <tr><td><span class="ui">Customer summary</span></td><td>The client</td><td>Coverage in plain words, scope and SLAs, team by role and location, year by year, transition, what we need from them. <b>No</b> contingency, risk, rounding or framework working</td></tr>
-<tr><td><span class="ui">Export Excel</span></td><td>Pricing sheet</td><td>13 sheets of plain numbers: towers, roles, locations, years, allowances, confidence …</td></tr>
+<tr><td><span class="ui">Export Excel</span></td><td>Pricing sheet</td><td>Sheets of plain numbers: towers, roles, locations, years, allowances, confidence …, and contract clauses if you listed any</td></tr>
 <tr><td><span class="ui">Save file</span></td><td>Colleagues, the deal folder</td><td>Every input, approval and saved scenarios; <span class="ui">Open file</span> reloads it exactly</td></tr>
 <tr><td><span class="ui">Add to Prism Library</span></td><td>SAs, the solution library</td><td>Opens the Library with the scale, team by role, years, AIOps use cases and assumptions filled in; you add industry, region and an anonymised description</td></tr>
 <tr><td><span class="ui">Copy summary</span></td><td>Slides, notes</td><td>The working as Markdown text</td></tr>
@@ -617,6 +645,8 @@ const FAQ=[
  ["How do I add an estimate to the solution library?","After the estimate is approved, File, then Add to Prism Library. The Library opens in a new tab with the form filled in. Add the industry, region and an anonymised description, then submit. Do not put the customer name in the description: the Library refuses it."],
  ["What does 'Changed since approval' mean?","Someone edited an input after the estimate was approved. Approve again or set the status back to Draft."],
  ["Extract inputs says the passphrase is wrong.","Ask the tool owner for the current passphrase; it's set on the Netlify project as INTAKE_PASSPHRASE."],
+ ["Do contract clauses change the team size?","No. Clauses only group the team that is already built, so you can show which part of the contract each FTE traces to. Add, edit or remove them and no number moves."],
+ ["A tower shows 'Not linked to a clause' in Step 9. What do I do?","Open Contract clauses, or the tower in Step 2, and tick the clauses it serves. If the tower serves no listed clause, leave it. It stays in the table and the total still adds up."],
  ["Where are my estimates stored?","In your browser only, until you Save file. Clearing browser data or using another browser starts fresh."],
  ["Does the SDM count as part of a tower?","No. Service Delivery Managers are sized in Step 4 at 1 per 12 delivery FTE and appear under Governance in the team by role."]
 ];
@@ -627,6 +657,7 @@ const GLOSS=[
  ["Work team","Step 2 (and skill cover, Step 5): the people the work takes, from volumetrics or thin slices. Transformation is counted separately in Stage 3."],
  ["Run team","The team that runs the service: Stage 1 plus Stage 2 (skill cover, SDM re-base, contingency), before any transformation capacity."],
  ["Transformation capacity","The Stage 3 line added to the run team: the Transformation POD (including AI engineers for AIOps) with the SDM and contingency that follow. Year 1 team = run team + transformation capacity."],
+ ["Contract clause","A line in the contract or RFP that decides the size or scope of the run team. Linked to the towers that serve it so the team can be traced back to the contract. It never changes the FTE."],
  ["Thin slice","A small unit of scope sized by criticality: an application for AMS, a data product for DMS. Critical, Important or Standard, each with a fixed FTE per slice (proposed, editable)."],
  ["Binding dimension","What sets the Stage 1 number: coverage (the support window) or ticket volume (the work)."],
  ["Reference range","Today's team ± the tolerance. A cross-check on the Stage 1 number, never an input."],
