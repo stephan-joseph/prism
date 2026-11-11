@@ -613,12 +613,28 @@ tr.sel td{background:var(--accent-soft)}
         <div class="prop" id="xProps"><div class="empty">Nothing yet. Add documents and run <b>Extract inputs</b>.</div></div>
         <div class="row" id="xApplyRow" hidden style="justify-content:space-between">
           <div class="row"><button class="btn ghost sm" type="button" id="xAll">Select all</button><button class="btn ghost sm" type="button" id="xNone">Select none</button></div>
-          <button class="btn primary" type="button" id="xApply">Apply selected and go to step 1</button>
+          <button class="btn primary" type="button" id="xApply">Apply selected and continue</button>
         </div>
       </div>
     </div>
 
-    <div class="stage-nav"><span></span><button class="btn primary" type="button" data-go="1">Skip to step 1 →</button></div>
+    <div class="stage-nav"><button class="btn" type="button" data-go="1">Skip to step 1</button><button class="btn primary" type="button" data-go="15">Next: contract clauses →</button></div>
+  </section>
+
+  <!-- ===================== CONTRACT CLAUSES (after Documents, before Step 1) ===================== -->
+  <section id="stage15" class="stage" aria-labelledby="s15h" hidden>
+    <div class="stage-head">
+      <span class="eyebrow">Start here · optional</span>
+      <h2 id="s15h">Contract clauses</h2>
+      <p>List the contract or RFP clauses that decide the size or scope of the run team, then link each one to the towers that serve it. Later, the Team shape: Year 1 screen shows how much of the team each clause accounts for. This only explains the number. It never changes it. You can add clauses by hand here, or have Claude propose them from the documents.</p>
+    </div>
+    <div class="panel">
+      <header><h3>Clauses</h3><span class="sub" id="clSub">None yet</span></header>
+      <div id="clList"></div>
+      <div class="row" style="margin-top:10px"><button class="btn sm" type="button" data-addclause="1">+ Add a clause</button></div>
+      <div class="hint" id="clHint" style="margin-top:8px"></div>
+    </div>
+    <div class="stage-nav"><button class="btn" type="button" data-go="0">← Documents</button><button class="btn primary" type="button" data-go="1">Next: step 1, coverage →</button></div>
   </section>
 
   <!-- ===================== STAGE 1 ===================== -->
@@ -1331,6 +1347,10 @@ tr.sel td{background:var(--accent-soft)}
       </div>
       <div class="hint">The Solution Architect (10% of an FTE once per deal, 0.8 hours of an 8-hour day) comes from the roles guidance map. The Product Support Engineer and the SRE are the FTE you type on each tower where L1.5 or SRE is in scope (Step 2), carved out of that tower's L2 or L3. The Solution Architect is carved out of the core-stream roles, so the team total never changes. The AI engineer (AIOps) appears only where AIOps is in scope on a tower (Step 2); Quality Analyst, Business Analyst, Solution Architect and Mobile Developer can be added as special roles on a tower. Service Delivery Managers follow the ratio in Step 7.</div>
     </div>
+    <div class="panel" id="clPanel">
+      <header><h3>FTE by contract clause</h3><span class="sub">Same Year 1 team, grouped by clause</span></header>
+      <div id="clTable"></div>
+    </div>
     <div class="stage-result" id="res-13" aria-live="polite"></div>
     <div class="stage-nav"></div>
   </section>
@@ -1868,7 +1888,7 @@ function mkTower(kind){
     agents:null,models:null,tools:null,ksrc:null,hiRisk:false,
     aiops:null,sre:null,sreFte:null,l15:null,l15Fte:null,special:[],levels:null,tktLevel:null,enh:null,basis:null,thin:{crit:null,imp:null,std:null},
     own:null,mix:null,sla:{P1r:null,P1x:null,P2r:null,P2x:null},avail:null,slaTier:"",
-    skills:[]};
+    skills:[],clauseIds:[]};
 }
 function defaults(){
   const d=defaultsRaw();autoLayout(d);return d;
@@ -1883,6 +1903,7 @@ function defaultsRaw(){
     backfill:true,
     rounding:"cell",
     towers:[],
+    clauses:[],
     bench:defaultBench(),
     sparePct:25,
     onCallPct:15,
@@ -2018,7 +2039,10 @@ function migrate(p){
       /* towers saved before a field existed get its default; the old L2/L3 choice becomes tier ownership */
       st._skillsDropped=(st.towers||[]).reduce((x,t)=>x+((t.skills||[]).length),0);
       st.towers=st.towers.map(t=>{const n=Object.assign(mkTower(t.kind),t);n.skills=[];n.sla=Object.assign(mkTower(t.kind).sla,t.sla||{});
-        if(!t.own&&t.levels)n.own={both:{L1:"customer",L2:"us",L3:"us"},l2:{L1:"customer",L2:"us",L3:"vendor"},l3:{L1:"customer",L2:"customer",L3:"us"}}[t.levels]||null;return n});
+        if(!t.own&&t.levels)n.own={both:{L1:"customer",L2:"us",L3:"us"},l2:{L1:"customer",L2:"us",L3:"vendor"},l3:{L1:"customer",L2:"customer",L3:"us"}}[t.levels]||null;
+        n.clauseIds=Array.isArray(t.clauseIds)?t.clauseIds.filter(x=>typeof x==="string"):[];return n});
+      /* contract clauses: estimates saved before this feature have none */
+      st.clauses=cleanClauses(p.clauses);
       st.meta=Object.assign(defaults().meta,p.meta||{});
       st.adj=Object.assign(defaults().adj,(p.adj&&typeof p.adj==="object")?p.adj:{});if(!Array.isArray(st.adj.y))st.adj.y=[];if(!st.adj.mit||typeof st.adj.mit!=="object")st.adj.mit={};if(!Array.isArray(st.adj.extra))st.adj.extra=[];
       st.cm=Object.assign(defaults().cm,(p.cm&&typeof p.cm==="object")?p.cm:{});["histMonths","ceiling"].forEach(k=>{if(st.cm[k]===""||st.cm[k]===undefined||isNaN(+st.cm[k]))st.cm[k]=null});if(["unknown","yes","no"].indexOf(st.cm.baseline)<0)st.cm.baseline="unknown";if(["low","medium","high"].indexOf(st.cm.pressure)<0)st.cm.pressure="medium";
@@ -3070,6 +3094,32 @@ function runSelfTests(){
   add("This estimate: the Library summary team adds up to the Year 1 team",fmt(R.total,2),LB?fmt(lbSum,2):"no summary",LB&&Math.abs(lbSum-R.total)<=0.05*Math.max(1,Object.keys(LB.team).length),"invariant");
   const probe={v:1,deny:["Société Ñandú – 日本"],library:{team:{"System Support Engineer":1.5}}}, dec=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encodeHandoff(probe).replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0))));
   add("The Library hand-off link keeps names with accents and other scripts intact","Société Ñandú – 日本",dec.deny[0],dec.deny[0]===probe.deny[0]&&!encodeHandoff(probe).match(/[+\/=]/),"hand-off");
+  /* contract clauses: they only group the finished Year 1 roles */
+  {
+    const twoTowers=(link)=>testState(st=>{
+      const a=amsTower(100,{name:"Apps"}), b=amsTower(60,{name:"Run"}); st.towers=[a,b];
+      st.clauses=[{id:"c1",ref:"2.1",obligation:"Apps support",target:"P1 15 min",source:"",evidence:""},{id:"c2",ref:"10",obligation:"Service levels",target:"99.9%",source:"",evidence:""},{id:"c3",ref:"4",obligation:"Hypercare",target:"",source:"",evidence:""}];
+      link(a,b)});
+    withState(twoTowers((a,b)=>{a.clauseIds=["c1","c2"];b.clauseIds=["c2"]}),R=>{
+      const A=clauseAlloc(R), r=id=>A.rows.find(x=>x.c.id===id), ta=R.roles.filter(x=>x.tw===R.towers[0].id).reduce((x,y)=>x+y.fte,0), tb=R.roles.filter(x=>x.tw===R.towers[1].id).reduce((x,y)=>x+y.fte,0);
+      add("Clause table: rows add up to the Year 1 team","the clause rows, shared roles and unlinked towers add up to the Year 1 team",`${fmt(A.sum,3)} of ${fmt(R.total,3)} FTE`,A.ok&&near(A.sum,R.total,0.001),"invariant");
+      add("Clause table: a tower linked to two clauses is split equally","clause 2.1 gets half of tower Apps; clause 10 gets the other half plus all of tower Run",`2.1 ${fmt(r("c1").fte,3)} · 10 ${fmt(r("c2").fte,3)}`,near(r("c1").fte,ta/2,1e-6)&&near(r("c2").fte,ta/2+tb,1e-6),"proposed");
+      add("Clause table: a clause with no tower is flagged","clause 4 has no tower and no FTE",`${A.unsized.map(x=>x.c.ref).join(", ")||"none"} · ${fmt(r("c3").fte,2)} FTE`,A.unsized.length===1&&A.unsized[0].c.id==="c3"&&r("c3").fte===0,"proposed");
+    });
+    withState(twoTowers((a,b)=>{a.clauseIds=["c1"]}),R=>{
+      const A=clauseAlloc(R), tb=R.roles.filter(x=>x.tw===R.towers[1].id).reduce((x,y)=>x+y.fte,0);
+      add("Clause table: a tower with no clause lands in Not linked","tower Run is not linked, so its FTE is shown as not linked",`${fmt(A.unlinked,3)} FTE · ${A.unlinkedTowers.join(", ")}`,near(A.unlinked,tb,1e-6)&&A.unlinkedTowers.join()==="Run"&&A.ok,"proposed");
+    });
+    withState(twoTowers((a,b)=>{a.clauseIds=["gone"];b.clauseIds=["c1"]}),R=>{
+      const A=clauseAlloc(R), ta=R.roles.filter(x=>x.tw===R.towers[0].id).reduce((x,y)=>x+y.fte,0);
+      add("Clause table: a link to a deleted clause is ignored","tower Apps points at a clause that no longer exists, so it counts as not linked",`${fmt(A.unlinked,3)} FTE not linked`,near(A.unlinked,ta,1e-6)&&A.ok,"proposed");
+    });
+    const old=JSON.parse(JSON.stringify(testState(st=>{st.towers=[amsTower(100)]})));delete old.clauses;old.towers.forEach(t=>delete t.clauseIds);
+    const mig=migrate(old);
+    add("Clause table: an estimate saved before clauses opens with none","no clauses and no tower links",`${mig.clauses.length} clauses, ${mig.towers.map(t=>t.clauseIds.length).join("/")} links`,Array.isArray(mig.clauses)&&mig.clauses.length===0&&mig.towers.every(t=>Array.isArray(t.clauseIds)&&!t.clauseIds.length),"migration");
+    const noClause=withState(testState(st=>{st.towers=[amsTower(100)]}),R=>R.total), withClause=withState(testState(st=>{const t=amsTower(100,{clauseIds:["x"]});st.towers=[t];st.clauses=[{id:"x",ref:"1",obligation:"",target:"",source:"",evidence:""}]}),R=>R.total);
+    add("Clause links never change the team total","the same estimate with and without clauses",`${fmt(noClause,3)} and ${fmt(withClause,3)} FTE`,near(noClause,withClause,1e-9),"invariant");
+  }
   return out;
 }
 function renderTests(){
@@ -3080,6 +3130,18 @@ function renderTests(){
 }
 
 /* ---------- Excel export ---------- */
+/* the clause table as plain rows, for the Excel export, the printable summary and the Markdown summary */
+function clauseSheetRows(){
+  if(!(S.clauses||[]).length)return null;
+  const A=clauseAlloc(R), n=A.yearN;
+  const head=["Clause","What it requires","Target","Towers","Year 1 FTE"].concat(n>1?[`Year ${n} FTE (approx.)`]:[]);
+  const row=(a,b,c,d,v)=>[a,b,c,d,+v.toFixed(2)].concat(n>1?[+(v*A.scale).toFixed(2)]:[]);
+  const rows=A.rows.map(r=>row(r.c.ref||"(no reference)",r.c.obligation,r.c.target,r.towers.length?r.towers.map(t=>t.name+(t.share>1?` (split ${t.share} ways)`:"")).join(", "):"Not sized: no tower linked",r.fte));
+  rows.push(row("Shared roles","Shift cover, transformation capacity and delivery managers","","",A.shared));
+  rows.push(row("Not linked to a clause","","",A.unlinkedTowers.join(", "),A.unlinked));
+  rows.push(row("Total","","","",A.sum));
+  return [head].concat(rows);
+}
 async function exportExcel(){
   try{await loadLib("xlsx")}catch(e){toast("Couldn't load the Excel library. Check the connection and try again.");return}
   renderS3();renderS4();renderS5();renderS6();renderS7();renderS8();update();renderDeskViews();
@@ -3104,6 +3166,7 @@ async function exportExcel(){
     (S.assumptions[k_]||[]).filter(a=>a.t.trim()).forEach((a,i)=>ar.push([STEPNO[n],"Assumption",`U${i+1}`,a.t,"","","deal team"]));
     (S.risks[k_]||[]).forEach(r=>ar.push([STEPNO[n],"Risk","",`${r.title}: ${r.note}`,n===8?"":+r.pct||0,r.on?"Yes":"No",""]))}
   sheet("Assumptions & risks",ar,[6,12,6,100,14,8,16]);
+  {const cr=clauseSheetRows();if(cr)sheet("Contract clauses",cr,[22,60,30,40,12,16].slice(0,cr[0].length))}
   sheet("Assumptions register",[["Category","Step","ID","Assumption","Source"]].concat(registerGroups().flatMap(g=>g.items.map(i=>[g.cat,i.step,i.id,i.t,i.src]))),[28,6,8,110,22]);
   const cols=R.scnCols||[];
   if(cols.length>1)sheet("Scenarios",[["Metric"].concat(cols.map(c=>c.name))].concat(SCN_ROWS.map(([l,f])=>[l].concat(cols.map(c=>f(c.m))))),[40].concat(cols.map(()=>22)));
@@ -3199,9 +3262,9 @@ function renderNav(){
   tabs+=tab(4,"Review","Check and commercial",R?`${fmt(R.fin.total,1)} FTE`:"–",R&&R.fin.on?"proposed":"optional",partOf(4)[0].n);
   const list=curPart?partOf(curPart):[], pos=ORDER.indexOf(cur);
   const chips=list.map(x=>{const st=stat[x.n], on=x.n===cur;return `<button type="button" class="schip ${on?"on":""}" data-go="${x.n}" ${on?'aria-current="step"':""} title="${esc(st[1]?x.t+": "+st[1]:x.t)}"><span class="n">${STEPNO[x.n]}</span>${esc(x.t)}<span class="st ${st[0]}" aria-hidden="true"></span><span class="sr" style="position:absolute;left:-9999px">${esc(st[1])}</span></button>`}).join("");
-  const where=cur===0?"Optional: let Claude propose inputs":curPart===1?`Step ${list.findIndex(x=>x.n===cur)+1} of ${list.length} · sizes the team from coverage, volumetrics or thin slices, and the current team`:curPart===2?`Step ${list.findIndex(x=>x.n===cur)+1} of ${list.length} · starts from the Stage 1 team, ${R?fmt(P,1):"–"} FTE`:curPart===3?`Step ${list.findIndex(x=>x.n===cur)+1} of ${list.length} · transformation capacity and the year-by-year lift`:`Step ${list.findIndex(x=>x.n===cur)+1} of ${list.length} · steps 1 to 13 stay as modelled; the commercial position is optional`;
+  const where=cur===0?(S.active===15?"Optional: list the contract clauses and link them to towers":"Optional: let Claude propose inputs"):curPart===1?`Step ${list.findIndex(x=>x.n===cur)+1} of ${list.length} · sizes the team from coverage, volumetrics or thin slices, and the current team`:curPart===2?`Step ${list.findIndex(x=>x.n===cur)+1} of ${list.length} · starts from the Stage 1 team, ${R?fmt(P,1):"–"} FTE`:curPart===3?`Step ${list.findIndex(x=>x.n===cur)+1} of ${list.length} · transformation capacity and the year-by-year lift`:`Step ${list.findIndex(x=>x.n===cur)+1} of ${list.length} · steps 1 to 13 stay as modelled; the commercial position is optional`;
   const prev=pos>0?ORDER[pos-1]:null, next=pos<ORDER.length-1?ORDER[pos+1]:null, nm=id=>(STAGES.find(x=>x.n===id)||{}).t||"Documents";
-  const pn=`${cur===0?"":prev!=null?`<button type="button" class="btn sm" data-go="${prev}" aria-label="Previous step: ${esc(nm(prev))}">←<span class="tx"> Previous</span></button>`:`<button type="button" class="btn sm" data-go="0" aria-label="Documents">←<span class="tx"> Documents</span></button>`}${cur===0?`<button type="button" class="btn sm primary" data-go="1">Step 1<span class="tx"> · Base team</span> →</button>`:next!=null?`<button type="button" class="btn sm primary" data-go="${next}" aria-label="Next step: ${esc(nm(next))}"><span class="tx">Next </span>→</button>`:""}`;
+  const pn=`${cur===0?(S.active===15?`<button type="button" class="btn sm" data-go="0" aria-label="Documents">←<span class="tx"> Documents</span></button>`:""):prev!=null?`<button type="button" class="btn sm" data-go="${prev}" aria-label="Previous step: ${esc(nm(prev))}">←<span class="tx"> Previous</span></button>`:`<button type="button" class="btn sm" data-go="0" aria-label="Documents">←<span class="tx"> Documents</span></button>`}${cur===0?(S.active===15?`<button type="button" class="btn sm primary" data-go="1">Step 1<span class="tx"> · Base team</span> →</button>`:`<button type="button" class="btn sm primary" data-go="15">Clauses<span class="tx"> · optional</span> →</button>`):next!=null?`<button type="button" class="btn sm primary" data-go="${next}" aria-label="Next step: ${esc(nm(next))}"><span class="tx">Next </span>→</button>`:""}`;
   const html=tabs+"\u0001"+chips+"\u0001"+where+"\u0001"+pn+"\u0001"+cur;
   if(html===NAVHTML)return;
   const keepScroll=$("stepChips").scrollLeft, sameTab=NAVHTML.split("\u0001")[4]===String(cur);
@@ -3225,7 +3288,7 @@ function renderRail(){
   fixStages();NAVHTML="";renderNav();
   document.querySelectorAll(".stage").forEach(sec=>{sec.hidden=sec.id!=="stage"+S.active});
 }
-function go(n){S.active=n;if(R)renderBar();if(n===3){renderS3();update();}if(n===4){renderS4();update();}if(n===5){renderS5();update();}if(n===6){renderS6();update();}if(n===7){renderS7();update();}if(n===8||n===9||n===10){renderS8();update();}if(n===11||n===12){renderS5();update();}if(n===13||n===14){update();}renderRail();save();window.scrollTo({top:0,behavior:"auto"})}
+function go(n){S.active=n;if(R)renderBar();if(n===2)renderS2();if(n===15){renderClauses();update();}if(n===3){renderS3();update();}if(n===4){renderS4();update();}if(n===5){renderS5();update();}if(n===6){renderS6();update();}if(n===7){renderS7();update();}if(n===8||n===9||n===10){renderS8();update();}if(n===11||n===12){renderS5();update();}if(n===13||n===14){update();}renderRail();save();window.scrollTo({top:0,behavior:"auto"})}
 
 /* ---------- stage 1 static render ---------- */
 /* choosing a region sets the customer location and time zone, offers that region's delivery locations and selects its defaults */
@@ -3298,6 +3361,54 @@ function specialsHtml(t){
       </div>
     </div>`;
 }
+/* ---------- contract clauses: screens ---------- */
+function clauseServedHtml(t){
+  const cs=S.clauses||[];
+  const body=cs.length
+    ?`<div class="tgrid">${cs.map(c=>`<label class="inline" for="tcl-${t.id}-${c.id}"><input type="checkbox" id="tcl-${t.id}-${c.id}" data-clink="${c.id}|${t.id}" ${(t.clauseIds||[]).includes(c.id)?"checked":""}> ${esc(c.ref||"(no reference)")}${c.obligation?` · ${esc(c.obligation.length>50?c.obligation.slice(0,50)+"…":c.obligation)}`:""}</label>`).join("")}</div><div class="hint">A tower that serves several clauses has its FTE split equally between them in the clause table on the Team shape: Year 1 screen. This explains the number and never changes it.</div>`
+    :`<div class="hint">No contract clauses yet. Add them if you want to trace the team back to the contract.</div><div class="row"><button type="button" class="btn sm" data-go="15">Open contract clauses</button></div>`;
+  return `<div class="tsec"><span class="h">Contract clauses served <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional)</span></span>${body}</div>`;
+}
+function renderClauses(){
+  const cs=S.clauses||[];
+  $("clList").innerHTML=cs.length?cs.map(c=>{
+    const tw=S.towers.map((t,i)=>`<label class="inline" for="clk-${c.id}-${t.id}"><input type="checkbox" id="clk-${c.id}-${t.id}" data-clink="${c.id}|${t.id}" ${(t.clauseIds||[]).includes(c.id)?"checked":""}> ${esc(twName(t,i))}</label>`).join("");
+    return `<div class="tower" data-clause="${c.id}">
+      <div class="th"><input class="tname" type="text" id="cr-${c.id}" data-cf="ref" value="${esc(c.ref)}" placeholder="Reference, for example 2.1" aria-label="Clause reference"><button type="button" class="btn ghost sm" data-rmclause="${c.id}">Remove</button></div>
+      <div class="tgrid"><label for="cob-${c.id}">What it requires<input type="text" id="cob-${c.id}" data-cf="obligation" value="${esc(c.obligation)}" maxlength="400"></label><label for="ctg-${c.id}">Target or SLA<input type="text" id="ctg-${c.id}" data-cf="target" value="${esc(c.target)}" maxlength="300"></label></div>
+      ${evHtml(c)}
+      <div class="tsec"><span class="h">Towers that serve this clause</span>${S.towers.length?`<div class="tgrid">${tw}</div>`:`<div class="hint">Add a tower in Step 2 first, then link it here.</div>`}<div class="hint" id="clw-${c.id}"></div></div>
+    </div>`}).join(""):`<div class="empty">No clauses yet. Add one by hand, or run Extract inputs on the Documents screen.</div>`;
+  updateClauses();
+}
+/* refreshes the text that depends on the links, without rebuilding the inputs (so typing keeps its focus) */
+function updateClauses(){
+  const cs=S.clauses||[];
+  const sub=$("clSub");if(sub)sub.textContent=cs.length?`${cs.length} clause${cs.length===1?"":"s"}`:"None yet";
+  cs.forEach(c=>{
+    const el=$("clw-"+c.id);if(!el)return;
+    const names=S.towers.map((t,i)=>(t.clauseIds||[]).includes(c.id)?twName(t,i):null).filter(Boolean);
+    el.innerHTML=names.length?`Linked to ${esc(names.join(", "))}.`:`<b style="color:var(--risk)">Not linked to any tower yet.</b> No FTE is tied to this clause until you link a tower.`;
+  });
+  const h=$("clHint");if(!h)return;
+  const un=S.towers.map((t,i)=>(cs.length&&!(t.clauseIds||[]).some(id=>cs.some(c=>c.id===id)))?twName(t,i):null).filter(Boolean);
+  h.textContent=cs.length&&un.length?`${un.length} tower${un.length===1?" is":"s are"} not linked to any clause: ${un.join(", ")}. Their FTE shows as "Not linked to a clause" on the Team shape: Year 1 screen.`:"";
+}
+function updateClauseTable(){
+  const el=$("clTable");if(!el)return;
+  const cs=S.clauses||[];
+  if(!cs.length){el.innerHTML=`<div class="hint">No contract clauses yet. Add the clauses that decide the size of the run team and link each to its towers to see how much of the Year 1 team each one accounts for.</div><div class="row" style="margin-top:8px"><button type="button" class="btn sm" data-go="15">Add contract clauses</button></div>`;return}
+  const A=clauseAlloc(R), n=A.yearN, f=x=>fmt(x,2), sc=x=>fmt(x*A.scale,2), yN=n>1;
+  const tr=(a,b,c,d,y1,y2,cls)=>`<tr${cls?` class="${cls}"`:""}><td class="loc-name">${a}</td><td class="hint">${b}</td><td class="hint">${c}</td><td class="hint">${d}</td><td class="r num">${y1}</td>${yN?`<td class="r num">${y2}</td>`:""}</tr>`;
+  const rows=A.rows.map(r=>tr(esc(r.c.ref||"(no reference)"),esc(r.c.obligation),esc(r.c.target),
+    r.towers.length?r.towers.map(t=>esc(t.name)+(t.share>1?` (split ${t.share} ways)`:"")).join(", "):`<b style="color:var(--risk)">Not sized: no tower linked</b>`,f(r.fte),sc(r.fte))).join("");
+  el.innerHTML=`<div class="loc-table"><table><thead><tr><th>Clause</th><th>What it requires</th><th>Target</th><th>Towers</th><th class="r">Year 1 FTE</th>${yN?`<th class="r">Year ${n} FTE (approx.)</th>`:""}</tr></thead><tbody>${rows}
+    ${tr("Shared roles","Shift cover, transformation capacity and delivery managers. They are not tied to one clause.","","",f(A.shared),sc(A.shared))}
+    ${tr("Not linked to a clause","Towers with no clause linked yet.","",A.unlinkedTowers.map(esc).join(", "),f(A.unlinked),sc(A.unlinked))}
+    ${tr("<b>Total</b>","","","",`<b>${f(A.sum)}</b>`,`<b>${sc(A.sum)}</b>`)}</tbody></table></div>
+    ${A.ok?`<div class="hint" style="margin-top:6px">Check: the rows add up to the Year 1 team of ${f(A.total)} FTE.</div>`:`<div class="alert" style="margin-top:8px">The rows add up to ${f(A.sum)} FTE but the Year 1 team is ${f(A.total)} FTE. The clause table does not tie out. Please report this.</div>`}
+    <div class="hint" style="margin-top:6px">A tower linked to several clauses has its FTE split equally between them.${yN?` The Year ${n} column applies the Year 1 split to that year's team, so it is approximate.`:""} This groups the modelled team. It never changes it.${R.fin&&R.fin.on?" A proposed final number is applied in the commercial step; it is not split by clause.":""}</div>`;
+}
 function renderS2(){
   $("towerList").innerHTML=S.towers.length?S.towers.map(t=>{
     const known=cpxKnown(t);
@@ -3350,6 +3461,7 @@ function renderS2(){
         </div>
         <div class="hint" id="tsh-${t.id}"></div>
       </div>
+      ${clauseServedHtml(t)}
       ${basisSec}
       <div class="tsec"><span class="h">Demand${t.basis==="thin"&&(t.kind==="AMS"||t.kind==="DMS")?" · volumetrics (cross-check)":""}</span>
         ${demand}
@@ -3475,6 +3587,34 @@ const GCORE=["sse","isu","dop","aio","dev","ie","de","aiml"];  /* what the Solut
 const DEFAULT_ROLE={AMS:"sse",IMS:"isu",DMS:"dop",AI:"aio"};
 /* Groups a team's role list (compute's roles) under the guidance map. Totals never change: core-stream roles are
    the work itself, and the cross-cutting roles that the ratios ask for are carved out of the core-stream roles. */
+/* ---------- contract clauses: which clause asks for which part of the Year 1 team ----------
+   This only groups the finished Year 1 roles. It never changes a number. */
+const MAX_CLAUSES=60;
+function cleanClauses(list){
+  if(!Array.isArray(list))return [];
+  const seen=new Set(), s=(v,n)=>typeof v==="string"?v.trim().slice(0,n):"";
+  return list.filter(c=>c&&typeof c==="object").slice(0,MAX_CLAUSES).map(c=>({id:s(c.id,40)||uid(),ref:s(c.ref,60),obligation:s(c.obligation,400),target:s(c.target,300),source:s(c.source,80),evidence:s(c.evidence,300)}))
+    .filter(c=>{if(seen.has(c.id))return false;seen.add(c.id);return true});
+}
+const twName=(t,i)=>t.name&&t.name.trim()?t.name.trim():`${t.kind} tower ${i+1}`;
+/* A tower's Year 1 FTE is split equally across the clauses it is linked to. Roles with no tower (shift cover, transformation,
+   delivery managers) are shared. Towers with no valid link are unlinked. Links to a clause that no longer exists are ignored. */
+function clauseAlloc(X){
+  const clauses=S.clauses||[], valid=new Set(clauses.map(c=>c.id));
+  const rows=clauses.map(c=>({c,fte:0,towers:[]})), by=Object.fromEntries(rows.map(r=>[r.c.id,r]));
+  const twFte={};let shared=0,total=0;
+  X.roles.forEach(r=>{total+=r.fte;if(r.tw)twFte[r.tw]=(twFte[r.tw]||0)+r.fte;else shared+=r.fte});
+  let unlinked=0;const unlinkedTowers=[];
+  X.towers.forEach((t,i)=>{
+    const f=twFte[t.id]||0, links=(t.clauseIds||[]).filter(id=>valid.has(id));
+    if(!links.length){if(f>1e-9){unlinked+=f;unlinkedTowers.push(twName(t,i))}return}
+    links.forEach(id=>{by[id].fte+=f/links.length;by[id].towers.push({name:twName(t,i),share:links.length})});
+  });
+  const sum=rows.reduce((x,r)=>x+r.fte,0)+shared+unlinked;
+  const n=Math.max(1,Math.min(5,+X.term||1)), y1=X.years[0].fte, yN=X.years[n-1].fte;
+  return {rows,shared,unlinked,unlinkedTowers,total,sum,ok:Math.abs(sum-total)<1e-6,unsized:rows.filter(r=>!r.towers.length),
+    yearN:n,scale:n>1&&y1>0?yN/y1:1};
+}
 function shapeOf(list,X){
   const g={}, add=(id,v)=>{if(v>0)g[id]=(g[id]||0)+v}, lifts=[];
   const SH=S.shape||{}, tw=id=>X.towers.find(t=>t.id===id);
@@ -3527,7 +3667,7 @@ function runCompute(){
 function asRun(fn){const M=R; R=M.run; try{fn()}finally{R=M}}
 function update(){
   R=compute(); R.run=runCompute(); R.shapeRun=shapeOf(R.run.roles,R.run); R.shapeY=shapeYears(R);
-  updateS1(); updateS2(); asRun(updateS3); updateS4(); asRun(updateS5); asRun(updateS6); R.gradeRows=gradeRowsFor(R); R.conf=confidence(); updateS7(); updateShape(); updateTrans(); asRun(updateS9); asRun(updateS11); asRun(updateS12); updateS8(); updateCP(); updateResults(); renderBar(); renderNav(); setNavH(); updateMeta(); save();
+  updateS1(); updateS2(); asRun(updateS3); updateS4(); asRun(updateS5); asRun(updateS6); R.gradeRows=gradeRowsFor(R); R.conf=confidence(); updateS7(); updateShape(); updateClauseTable(); updateClauses(); updateTrans(); asRun(updateS9); asRun(updateS11); asRun(updateS12); updateS8(); updateCP(); updateResults(); renderBar(); renderNav(); setNavH(); updateMeta(); save();
 }
 /* A compact version of the coverage timeline for the inputs panel: one 48-cell bar per row, on the customer clock from the window start. */
 function miniHtml(C){
@@ -4184,7 +4324,7 @@ function updateS8(){
 }
 
 function renderBar(){
-  document.body.classList.toggle("on-docs",S.active===0);
+  document.body.classList.toggle("on-docs",S.active===0||S.active===15);
   const cur=ORDER.includes(S.active)?S.active:1, pos=ORDER.indexOf(cur), reached=id=>ORDER.indexOf(id)<=pos;
   /* Stages 1 and 2 describe the run team (no transformation, no AI engineers); Stage 3 adds the transformation capacity on top */
   const Rr=R.run, P=Rr.p1, B=Rr.bridge, trans=R.total-Rr.total;
@@ -4492,6 +4632,7 @@ function buildReport(){
   <h3>Final team by location</h3>
   <table><thead><tr><th>Location</th><th class="r">L2</th><th class="r">L3</th><th class="r">SDM</th><th class="r">${whole&&S.rounding!=="total"?"People":"FTE"}</th></tr></thead><tbody>${locRows}</tbody></table>
   <h3>Year 1 team by role</h3>${tableOf("finalRoles")}
+  ${(()=>{const cr=clauseSheetRows();if(!cr)return "";return `<h3>FTE by contract clause</h3><table><thead><tr>${cr[0].map((h,i)=>`<th${i>3?' class="r"':""}>${esc(h)}</th>`).join("")}</tr></thead><tbody>${cr.slice(1).map(r=>`<tr>${r.map((v,i)=>`<td${i>3?' class="r"':""}>${i>3?fmt(v,2):esc(v)}</td>`).join("")}</tr>`).join("")}</tbody></table><p class="muted">A tower linked to several clauses has its FTE split equally between them. This groups the modelled team and never changes it.</p>`})()}
   <h3>Allowances in the Year 1 team</h3><div class="working">${$("finalAllow").innerHTML}</div>
   <h3>Where the inputs came from</h3>${tableOf("finalProv")}
   <h3>Deviations from the framework</h3>${tableOf("finalDev")}
@@ -4615,6 +4756,8 @@ document.addEventListener("click",e=>{
   if(chipEl){go(+chipEl.dataset.gochip);return}
   const t=e.target.closest("button");if(!t)return;
   const d=t.dataset;
+  if(d.addclause){S.clauses=S.clauses||[];if(S.clauses.length<MAX_CLAUSES){const c={id:uid(),ref:"",obligation:"",target:"",source:"",evidence:""};S.clauses.push(c);renderClauses();update();const el=$("cr-"+c.id);if(el)el.focus()}return}
+  if(d.rmclause){S.clauses=(S.clauses||[]).filter(c=>c.id!==d.rmclause);S.towers.forEach(x=>{x.clauseIds=(x.clauseIds||[]).filter(i=>i!==d.rmclause)});renderClauses();update();return}
   if(d.cpmode){S.adj.mode=d.cpmode;update();return}
   if(d.cmpress){S.cm.pressure=d.cmpress;update();return}
   if(d.adjadd!=null){const inp=$("adjNewMit");if(inp&&inp.value.trim()){S.adj.extra=S.adj.extra||[];S.adj.extra.push({t:inp.value.trim()});update()}return}
@@ -4756,11 +4899,15 @@ document.addEventListener("input",e=>{
   if(d.bn){const v=+t.value;if(t.value!==""&&v>=0){const [a,b2]=d.bn.split(".");if(b2)S.bench[a][b2]=v;else S.bench[a]=v;update()}return}
   if(d.f){const l=S.locations.find(x=>x.id===t.closest("tr").dataset.loc);const v=+t.value;if(t.value!==""&&v>=0&&v<=100){l[d.f]=v;update()}return}
   if(d.tf==="name"){S.towers.find(x=>x.id===t.closest("[data-tower]").dataset.tower).name=t.value;update();return}
+  if(d.cf){const box=t.closest("[data-clause]"),c=box&&(S.clauses||[]).find(x=>x.id===box.dataset.clause);if(c&&["ref","obligation","target"].includes(d.cf)){c[d.cf]=t.value;update()}return}
   if(d.assume){const [k,i]=pair(d.assume);S.assumptions[k][+i].t=t.value;save();return}
   if(d.rf&&d.rf!=="on"){const r=findRisk(t);if(d.rf==="pct"){const v=+t.value;if(t.value!==""&&isFinite(v)&&v>=-50&&v<=100){r.pct=v;update()}}else{r[d.rf]=t.value;save()}return}
 });
 document.addEventListener("change",e=>{
   const t=e.target, d=t.dataset;
+  if(d.clink){const [cid,tid]=d.clink.split("|"), tw=S.towers.find(x=>x.id===tid);
+    if(tw&&(S.clauses||[]).some(c=>c.id===cid)){tw.clauseIds=tw.clauseIds||[];const i=tw.clauseIds.indexOf(cid);if(t.checked&&i<0)tw.clauseIds.push(cid);else if(!t.checked&&i>=0)tw.clauseIds.splice(i,1)}
+    update();return}
   if(t.id==="cpOn"){S.adj.on=t.checked;update();return}
   if(t.id==="cpReason"){S.adj.reason=t.value;update();return}
   if(t.id==="cmBase"){S.cm.baseline=t.value;update();return}
@@ -4901,7 +5048,8 @@ function summary(){
   L.push("",$("exVerdict").textContent);}
   rows("s8");
   renderDeskViews();
-  L.push("","## Year 1 team by role","","| Role | Tower | FTE |","|---|---|---|");R.roles.forEach(r=>L.push(`| ${r.role} | ${r.tower} | ${fmt(r.fte,2)} |`));commercialMd(L);
+  L.push("","## Year 1 team by role","","| Role | Tower | FTE |","|---|---|---|");R.roles.forEach(r=>L.push(`| ${r.role} | ${r.tower} | ${fmt(r.fte,2)} |`));
+  {const cr=clauseSheetRows();if(cr){L.push("","## FTE by contract clause","",`| ${cr[0].join(" | ")} |`,`|${cr[0].map(()=>"---").join("|")}|`);cr.slice(1).forEach(r=>L.push(`| ${r.map(v=>String(v).replace(/\|/g,"/")).join(" | ")} |`));L.push("","A tower linked to several clauses has its FTE split equally between them. This groups the modelled team and never changes it.")}}commercialMd(L);
   {const A=R.allow;L.push("","## Allowances in the Year 1 team",`- Productive need ${fmt(A.core,2)}; productive-time allowance ${sgn(A.util,2)}; leave backfill ${sgn(A.leave,2)}; contingency ${sgn(A.cont,2)}; risk ${sgn(A.risk,2)} → ${fmt(A.total,2)} FTE`,`- Buffer above productive capacity: ${fmt(A.buffer,2)} FTE (${fmt(A.bufferPct,1)}%)`);}
   L.push("","## Assumptions register");registerGroups().forEach(g=>{L.push("",`### ${g.cat}`);g.items.forEach(i=>L.push(`- (step ${i.step}) ${i.t} [${i.src}]`))});
   L.push("","## Where the inputs came from");if(R.provRows.length){L.push("","| Input | Source | Evidence | Status |","|---|---|---|---|");R.provRows.forEach(r=>L.push(`| ${r.label} | ${r.source} | ${r.evidence||"–"} | ${r.edited?"edited after import":"as imported"} |`))}else L.push("- Every input was entered by the deal team.");
@@ -5133,6 +5281,7 @@ function towerLine(t){
   if(t.priorityMix)parts.push(`mix ${["P1","P2","P3","P4"].map(k=>t.priorityMix[k]??0).join("/")}`);
   if(t.ticketLevel&&t.volumetrics&&t.ticketLevel!=="L1")parts.push(`counts at ${t.ticketLevel}`);
   if(t.enhancementHoursPerMonth)parts.push(`${t.enhancementHoursPerMonth}h enhancements a month`);
+  if(t.clauseRefs&&t.clauseRefs.length)parts.push(`serves clause${t.clauseRefs.length>1?"s":""} ${t.clauseRefs.join(", ")}`);
   return parts.join(" · ");
 }
 function showProposals(j){
@@ -5140,6 +5289,7 @@ function showProposals(j){
   if(j.clientName)add(0,"client","Deal name",j.clientName);
   if(j.coverage){const c=j.coverage;const parts=[];if(c.hoursPerDay||c.daysPerWeek)parts.push(`${c.hoursPerDay??S.hours} hours a day × ${c.daysPerWeek??S.days} days`);if(c.outOfHours)parts.push(`out of hours: ${c.outOfHours==="oncall"?"on-call for P1":"active"}`);if(c.weekends)parts.push(`weekends: ${c.weekends}`);if(c.p1PerMonth!=null)parts.push(`${c.p1PerMonth} P1 incidents a month (on-call allowance from P1 volume)`);add(1,"coverage","Coverage window",parts.join(" · "),c)}
   (j.towers||[]).forEach((t,i)=>add(2,"tower:"+i,`${KIND_NAME[t.kind]} tower${t.name?`: ${t.name}`:""}`,towerLine(t),t));
+  (j.clauses||[]).forEach((c,i)=>add(0,"cl:"+i,"Contract clause",`${c.ref}: ${c.obligation}${c.target?` (target: ${c.target})`:""}`,c));
   if(j.aiAdoption)add(4,"ai","Client AI adoption",j.aiAdoption.value,j.aiAdoption);
   if(j.complexity)add(6,"cplx","Engagement complexity",j.complexity.value,j.complexity);
   if(j.termYears)add(7,"term","Contract term",`${j.termYears.value} year${j.termYears.value>1?"s":""}`,j.termYears);
@@ -5200,10 +5350,22 @@ function applyProposals(){
     if(c.p1PerMonth!=null){S.p1PerMonth=c.p1PerMonth;S.ocMode="p1";mark("p1","P1 incidents a month",{source:c.p1Source||c.source,evidence:c.p1Evidence||""})}
     n++;
   }
+  /* contract clauses: add the ticked ones (a clause with the same reference is updated, not repeated), then link towers by reference */
+  const clKey=v=>String(v||"").trim().toLowerCase().replace(/\s+/g," ");
+  S.clauses=S.clauses||[];let nClauses=0;
+  (j.clauses||[]).forEach((c,i)=>{
+    if(!on("cl:"+i))return;
+    const ex=S.clauses.find(x=>clKey(x.ref)===clKey(c.ref));
+    if(ex){if(!ex.obligation)ex.obligation=c.obligation;if(!ex.target&&c.target)ex.target=c.target;ex.source=ex.source||c.source||"";ex.evidence=ex.evidence||c.evidence||""}
+    else if(S.clauses.length<MAX_CLAUSES)S.clauses.push({id:uid(),ref:c.ref,obligation:c.obligation,target:c.target||"",source:c.source||"",evidence:c.evidence||""});
+    else return;
+    nClauses++;n++;
+  });
   (j.towers||[]).forEach((t,i)=>{
     if(!on("tower:"+i))return;
     const sel=document.querySelector(`[data-xmerge="tower:${i}"]`), target=sel&&sel.value&&sel.value!=="new"?S.towers.find(x=>x.id===sel.value):null;
     const tw=buildTowerFromProposal(t,target);
+    (t.clauseRefs||[]).forEach(ref=>{const cl=S.clauses.find(x=>clKey(x.ref)===clKey(ref));if(cl){tw.clauseIds=tw.clauseIds||[];if(!tw.clauseIds.includes(cl.id))tw.clauseIds.push(cl.id)}});
     if(!target)S.towers.push(tw);
     mark("tower:"+tw.id,`${t.kind} tower${t.name?`: ${t.name}`:""}${target?" (updated)":""}`,t);n++;
   });
@@ -5215,13 +5377,13 @@ function applyProposals(){
   (j.assumptions||[]).forEach((a,i)=>{if(on("as:"+i)){S.assumptions["s"+a.stage].push({t:`${a.text} (from ${src(a)})`,c:ACAT_DEFAULT["s"+a.stage]||"Other"});n++}});
   (j.risks||[]).forEach((r,i)=>{if(on("rk:"+i)){S.risks["s"+r.stage].push({id:uid(),on:false,pct:0,title:r.title,note:`${r.note||""} (from ${src(r)})`.trim()});n++}});
   (j.openQuestions||[]).forEach(q=>S.assumptions.s1.push({t:`To confirm with the client: ${q}`,c:"Client responsibilities"}));
-  renderAll();go(1);toast(`${n} input${n===1?"":"s"} applied from the documents`);
+  renderAll();go(nClauses?15:1);toast(`${n} input${n===1?"":"s"} applied from the documents`+(nClauses?`, including ${nClauses} contract clause${nClauses===1?"":"s"}. Check the links to towers, then continue.`:""));
 }
 
 /* ---------- boot ---------- */
-function renderAll(){renderMeta();renderRail();renderS0();renderS1();renderS2();renderS3();renderS4();renderS5();renderS6();renderS7();renderS8();["s1","s2","s3","s4","s5","s6","s7","s8","s9"].forEach(k=>{renderAssume(k);if(S.risks[k])renderRisks(k)});update();}
+function renderAll(){renderMeta();renderRail();renderS0();renderClauses();renderS1();renderS2();renderS3();renderS4();renderS5();renderS6();renderS7();renderS8();["s1","s2","s3","s4","s5","s6","s7","s8","s9"].forEach(k=>{renderAssume(k);if(S.risks[k])renderRisks(k)});update();}
 /* deep link from the user guide: index.html#stage=3 opens that stage */
-{const m=/stage=(\d+)/.exec(location.hash);if(m&&+m[1]>=0&&+m[1]<=14)S.active=+m[1];}
+{const m=/stage=(\d+)/.exec(location.hash);if(m&&+m[1]>=0&&+m[1]<=15)S.active=+m[1];}
 renderAll();
 updateFreshLabel();
 detectRoute();

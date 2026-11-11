@@ -33,13 +33,15 @@ Open `index.html` in a browser for the calculators. Extraction needs it served o
 python3 -m http.server 8000
 ```
 
-Self-tests (the engine's checks against the framework's worked examples, plus invariants and feature tests). Expect every test to pass; the count was 116 after the build-only change.
+Self-tests (the engine's checks against the framework's worked examples, plus invariants and feature tests). Expect every test to pass; the count was 123 after the contract clauses change.
 
 ```bash
 python3 scripts/run-selftests.py
 ```
 
 The same tests run in the app from the "Run checks" button in the final review step. Add a test whenever you change the engine.
+
+The clause cleaning in `extract-prompt.mjs` has its own Node checks: `node scripts/test-extract.mjs`.
 
 ## Deploy
 
@@ -67,6 +69,7 @@ Key areas in `index.html`:
 - **Savings and term:** `USECASES` (20: 14 assistive, 6 agentic with autonomy levels), `pfOf`, `pfYears`, and the **productivity commitment** `S.prod` (default 12% a year from Year 2, never below the floor). The year-by-year team follows the committed path; `years[n].mBase` is the modelled path and `years[n].gap` is the unsupported part.
 - **Extraction:** `runExtraction`, `showProposals`, `applyProposals`. A pasted Prism Library reference sheet is read directly without the AI (`isLibRef`, `parseLibraryReference`). An extracted tower of a kind you already have offers update or add (`buildTowerFromProposal`).
 - **Library hand-off:** `libraryBlock()` adds a `library` summary to saved files. File, Add to Prism Library opens the Library with the summary in the link fragment (`#import=`, base64url JSON; never sent to a server).
+- **Contract clauses:** `S.clauses` and `clauseIds` on each tower. `clauseAlloc` groups the Year 1 roles by clause (it never changes a number). Screen 15 (`renderClauses`, between Documents and Step 1, not in `ORDER`), the Step 2 selector (`clauseServedHtml`), the Team shape table (`updateClauseTable`), and `clauseSheetRows` for the exports. Extraction returns `clauses` and `towers[].clauseRefs`; `applyProposals` links by reference and never on a guess.
 - **State and migration:** `defaultsRaw`, `migrate`. Estimates saved before a feature keep their own method (see `st.prod`, `st.aiopsPf`).
 - **Start fresh setting:** File menu, per browser. When on, opening the address starts a new estimate; reloading keeps the current one.
 

@@ -21,6 +21,9 @@ export const SKILL_IDS = {
   ds: "Data Scientist",
 };
 
+/* the most clauses one extraction may return; keeps the reply short on a gateway model */
+export const MAX_CLAUSES = 25;
+
 const SCHEMA_EXAMPLE = {
   docSummary: "3-5 sentences in your own words: client, scope, service window, what is being asked for.",
   clientName: "Acme Bank",
@@ -33,8 +36,10 @@ const SCHEMA_EXAMPLE = {
     volumetrics: { incidentsPerMonth: 120, serviceRequestsPerMonth: 40, changeRequestsPerMonth: 8 }, srComplexityMix: { low: 60, medium: 30, high: 10 }, crComplexityMix: { low: 50, medium: 35, high: 15 }, ticketLevel: "L1", enhancementHoursPerMonth: 80,
     structural: { apps: { S: 0, M: 3, L: 2, XL: 1, XXL: 0 } },
     mau: 50000, estate: "legacy", aiopsInScope: true, skills: ["be", "fe"],
+    clauseRefs: ["2.1", "10"],
     evidence: "short quote", source: "Incident dump",
   }],
+  clauses: [{ ref: "2.1", obligation: "Platform administration, patching and upgrades.", target: "99.9% availability", evidence: "short quote", source: "RFP" }],
   aiAdoption: { value: "low", evidence: "short quote", source: "Meeting notes" },
   complexity: { value: "high", evidence: "short quote", source: "RFP" },
   termYears: { value: 3, evidence: "short quote", source: "RFP" },
@@ -71,6 +76,9 @@ const RULES = `Rules:
 - towers[].sreInScope (IMS only): true if the client names site reliability engineering / SRE as a capability or objective (SLOs, error budgets, toil reduction); false if excluded. Omit if not mentioned.
 - towers[].aiopsInScope: true if the client wants AIOps for that estate (intelligent alerting, automated RCA, ticket auto-classification, anomaly detection, self-healing); false if AIOps is explicitly excluded. Omit if not mentioned.
 - towers[].skills: ids from this list only: ${Object.entries(SKILL_IDS).map(([k, v]) => `${k} = ${v}`).join("; ")}.
+- clauses: the contract or RFP clauses that decide the size or scope of the run team: service scope, service levels and SLAs, support hours, security and compliance duties, transition and hypercare, volumes and exclusions. Skip commercial, legal and boilerplate clauses. At most 25. Keep "ref" exactly as written in the document (for example "2.1" or "Section 10"). Omit the list if the documents have no numbered or named clauses. Never invent a reference.
+- clauses[].obligation: what the clause requires, in your own words, under 20 words. clauses[].target: the measurable target or SLA copied from the document, if there is one.
+- towers[].clauseRefs: the "ref" of each clause in the clauses list that this tower serves. Use only references that appear in the clauses list. Omit if you are not sure.
 - aiAdoption.value: "low" or "moderate" ("moderate" = AI in observability, automated runbooks or self-healing already in production).
 - complexity.value: "low", "medium" or "high" for the engagement overall.
 - termYears.value: 1-5.
@@ -118,6 +126,20 @@ export function sanitizeExtraction(raw) {
       ...ev(c),
     });
   }
+  /* clauses first, because a tower may only name clauses that exist in the list */
+  const clauseKey = (v) => String(v).trim().toLowerCase().replace(/\s+/g, " ");
+  const clauses = [], seenRef = new Set();
+  if (Array.isArray(r.clauses)) {
+    for (const c of r.clauses) {
+      if (clauses.length >= MAX_CLAUSES) break;
+      const ref = c && str(c.ref, 60), obligation = c && str(c.obligation, 300);
+      if (!ref || !obligation || seenRef.has(clauseKey(ref))) continue;
+      seenRef.add(clauseKey(ref));
+      clauses.push({ ref, obligation, target: str(c.target, 200), ...ev(c) });
+    }
+  }
+  if (clauses.length) out.clauses = clauses.map((c) => prune({ ...c }));
+  const clauseByKey = new Map(clauses.map((c) => [clauseKey(c.ref), c.ref]));
   if (Array.isArray(r.towers)) {
     out.towers = r.towers.slice(0, 12).map((t) => {
       if (!t || typeof t !== "object") return undefined;
@@ -146,6 +168,10 @@ export function sanitizeExtraction(raw) {
         ticketLevel: oneOf(t.ticketLevel, ["L1", "L2", "L3"]),
         enhancementHoursPerMonth: num(t.enhancementHoursPerMonth, 0, 1e6),
         skills: Array.isArray(t.skills) ? [...new Set(t.skills.filter((k) => k in SKILL_IDS))] : undefined,
+        clauseRefs: Array.isArray(t.clauseRefs) ? (() => {
+          const refs = [...new Set(t.clauseRefs.filter((x) => typeof x === "string").map((x) => clauseByKey.get(clauseKey(x))).filter(Boolean))].slice(0, 8);
+          return refs.length ? refs : undefined;
+        })() : undefined,
         ...ev(t),
       });
     }).filter(Boolean);

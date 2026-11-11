@@ -145,6 +145,16 @@ Set these in Site configuration → Environment variables:
 
 Netlify installs `package.json` dependencies (`@anthropic-ai/sdk`, `@netlify/blobs`, `@netlify/functions`) at build time. There is no build command.
 
+## Contract clauses (after Documents, before Step 1)
+
+An optional screen between Documents and Step 1. It lists the contract or RFP clauses that decide the size or scope of the run team and links each one to the towers that serve it. The Team shape: Year 1 screen then shows how much of the Year 1 team each clause accounts for. **It only explains the number. It never changes it.**
+
+- **Where clauses come from.** Extract inputs also returns up to 25 clauses (reference, what it requires, target, a quote) and, for each tower, the references it serves. They appear in the proposals list with the other proposals, and nothing is applied until you tick it. After you apply clauses, the Clauses screen opens so you can check the links. You can also add clauses by hand on that screen. A tower can only be linked to a clause that exists in the list.
+- **Linking.** On the Clauses screen, tick the towers that serve each clause. Step 2 has the same choice on each tower ("Contract clauses served"). A clause with no tower shows "Not sized".
+- **The table.** Each tower's Year 1 FTE is split equally across the clauses it is linked to. Roles with no tower (shift cover, transformation capacity, delivery managers) are shown as "Shared roles". A tower with no link is shown as "Not linked to a clause". A check confirms the rows add up to the Year 1 team and shows an error if they do not. The last year of the term is shown as well, but only as an approximation: it applies the Year 1 split to that year's team, because the tool keeps FTE by tower for Year 1 only.
+- **Where it appears.** The saved file keeps the clauses (`S.clauses`, and `clauseIds` on each tower). The table is in the Excel export (sheet "Contract clauses"), the printable summary and the Markdown summary. The table groups the modelled team: a proposed final number from the commercial step is not split by clause.
+- **Old estimates** open with no clauses.
+
 ## Stage 1 · Step 1: coverage and base team
 
 Inputs:
