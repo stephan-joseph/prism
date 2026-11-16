@@ -157,9 +157,9 @@ An optional screen between Documents and Step 1. It lists the contract or RFP cl
 
 ## Bottom-up method (activity based)
 
-A second way to size a deal, chosen on the Documents screen (**Choose how to size this deal**) or from File, Sizing method. It is a separate flow: the tower method, its steps and its results are not changed, and each method keeps its own inputs (`S.method` is `tower` or `bottomup`; the bottom-up inputs are `S.bu`). Estimates saved before the choice open as tower based.
+A second way to size a deal, chosen on the Documents screen (**Choose how to size this deal**) or from File, Sizing method. It has its own engine and steps (`S.method` is `tower` or `bottomup`; the bottom-up inputs are `S.bu`), and the tower engine and its steps are not changed. Activities, drivers, use cases, floors and tiers belong to bottom-up alone. Coverage, locations, complexity, contingency, the manager ratio and the existing team are shared with the tower method (see below). Estimates saved before the choice open as tower based, and a bottom-up estimate saved before the qualifiers existed keeps its numbers.
 
-**Steps (ids 20 to 24):** 1 Scope and drivers; 2 RFP activities; 3 Use cases and automation; 4 Roles and FTE; 5 Review and export.
+**Steps:** 1 Coverage and locations (the tower method's Step 1 screen, shared); 2 Scope and drivers (id 20); 3 RFP activities (21); 4 Use cases and automation (22); 5 Complexity, managers and grade mix (25); 6 Roles and FTE (23); 7 Review and export (24). Step ids are stable; the order is set by `BU_STAGES`.
 
 **Formulas** (`computeBU()`), for activity a in year n between its from and to years:
 
@@ -171,23 +171,35 @@ A second way to size a deal, chosen on the Documents screen (**Choose how to siz
 - hypercare adds a share of Year 1 run hours, in Year 1 only
 - FTE = hours a month ÷ productive hours per FTE a month; each role is rounded up to the step and held at its floor
 
-**Layers:** run O&M, AI run, governance and delivery, continuous improvement, transition and hypercare, AI build, and floors and rounding. They add up to the team in both AI build modes. **AI build** is a separate team by default; the switch carries it inside the run roles in proportion to their hours. Build effort lands in each use case's start year, plus a one-time foundation build in Year 1.
+**Coverage, locations, complexity, managers and grade mix.** These come from the tower method and read the same shared inputs (`S.days`, `S.hours`, `S.locations`, on-call, utilisation, `S.cplx`, `S.contPct`, `S.cont2`, `S.sdmRatio`, `S.sdmLoc`, `S.ex`, `S.exTol`, `S.conf`), so a change in either method changes both. The tower engine is not changed. Each has an on/off switch in `S.bu` (`coverageOn`, `backfillOn`, `contOn`, `sdmOn`, `gradesOn`). A new estimate has them on; an estimate saved before they existed has them off, so its numbers do not move (one saved with no activities has nothing to preserve, so it has them on). Per year, in this order:
+
+- **Roles have a tier** (L2, L3 or other), guessed from the name and editable. L2 and L3 roles staff the shifts. Managers and AI, data, release, security and database roles are guessed as other.
+- **Leave and holiday backfill:** the L2 and L3 hours are multiplied by Σ (a location's share of the window ÷ its availability). Needs backfill on in step 1.
+- **Coverage floor:** `baseTeamOf(S)` is the roster maths of the tower's Step 1 (staffed hours × people ÷ contracted hours, then utilisation, leave backfill and the Step 1 risk buffers). If the L2 and L3 roles come to less, the gap is added as L2 and L3 in the window's own ratio, rounded up to the step. It stays when automation cuts hours. A test checks `baseTeamOf` against `compute()` in 8 configurations.
+- **Managers:** one SDM per `S.sdmRatio` delivery FTE (delivery roles plus any top-up). The default, automatic, adds it unless an activity already supplies a delivery lead, so the lead is never counted twice. "Always from the ratio" and "from the activities only" are the other modes; a check warns if the first is chosen and an activity also gives a lead.
+- **Contingency:** `S.contPct`, or the complexity's default (low 5%, medium 7.5%, high 10%), on delivery plus SDM in Year 1; `S.cont2`, or the lower of Year 1 and 6%, after. It is carried by the L2 and L3 tiers. No complexity means no contingency, and a check says so.
+- **Grade mix:** the tower's `gradeSplit` splits delivery, contingency and SDM into Lead, Senior and Consultant with the complexity's pyramid. It is a view, in FTE, and does not change the team.
+- **By location:** delivery follows each location's share of the window; managers, other roles and the AI build team sit at the SDM location.
+
+**Layers:** run O&M, AI run, governance and delivery, continuous improvement, transition and hypercare, leave and holiday backfill, coverage floor top-up, managers, contingency, AI build, and floors and rounding. They add up to the team in both AI build modes. **AI build** is a separate team by default; the switch carries it inside the run roles in proportion to their hours. Build effort lands in each use case's start year, plus a one-time foundation build in Year 1.
 
 **Use cases:** `CATALOGUE` has 29 use cases (build effort and duration ranges, token cost, prerequisites). Effort is the range midpoint unless edited. A use case built inside another that is on (UC-08 inside UC-05 or UC-06) has no separate build days. Role names are matched ignoring case and spacing, and a role floor uses the spelling it was typed with. It is reference data for this method only; the tower method's use cases (`USECASES`) are untouched.
 
-**Year to year:** step 4 splits each year's change into volume growth, more automation, activities starting or ending, hypercare, AI build, and floors and rounding. They add up to the change.
+**Year to year:** the Roles and FTE screen splits each year's change into volume growth, more automation, activities starting or ending, hypercare, AI build, coverage floor top-up, leave backfill, managers, contingency, and floors and rounding. They add up to the change.
 
-**Checks (15):** two must reconcile (role hours equal activity hours; hours released by use case equal hours released by activity). The rest warn: term not set, no activities, no hours, no first role, role split incomplete, lever without a use case, volume scaling without a driver, from year after to year, use cases switched off or unused, prerequisites off, a use case starting after the term (it is not built or counted), uncalibrated activities.
+**Checks (18):** two must reconcile (role hours equal activity hours; hours released by use case equal hours released by activity). The rest warn or note: support window gaps or overlaps, complexity not set, a delivery lead counted twice, term not set, no activities, no hours, no first role, role split incomplete, lever without a use case, volume scaling without a driver, from year after to year, use cases switched off or unused, prerequisites off, a use case starting after the term (it is not built or counted), uncalibrated activities.
+
+**Existing team and confidence.** Review compares today's team (the shared `S.ex`, within `S.exTol`) with Year 1: support (L2, L3, SRE and automation) against our delivery team plus contingency, and managers and other roles against our SDM and other roles. A separate AI build team is left out. The estimate confidence guide (Annexure 1, nine weighted drivers rated by hand in step 5, unrated counts as 3) shows the band and its contingency guidance. It is advisory and never changes the FTE; the tower's suggested ratings come from its towers, so they are not used here.
 
 **From documents.** With bottom-up on, Extract inputs also proposes `activities` (RFP reference, name, tower kind, an optional starter library match, driver and quantity when stated, use case ids from the catalogue only) and `optionYears`. Drivers are per tower, so the same driver name for AMS and IMS (alerts) never shares a quantity; a stated quantity that differs from its driver stays on the activity. The activities part of the prompt is sent only when bottom-up is on, so tower extractions keep the shorter prompt and reply. Nothing is guessed: an activity with no library match arrives with no hours and the checks flag it. An activity already listed (same reference and name) is filled in, not repeated. In tower mode the proposals show a note and activities are not applied.
 
 **Starter library.** `ACTIVITY_LIBRARY` in `extract-prompt.mjs` has 22 generic activities by tower kind (AMS, IMS, DMS, AI, governance). Every hours, lever and role value is invented and proposed. A lever is set only where a use case sits behind it. Add one from the picker on step 2.
 
-**Export.** Export, Bottom-up workbook (CSV) (text that starts with = + - @ is prefixed with an apostrophe so a spreadsheet cannot run it): team by role and year, layers, net saving, activities, use cases and checks. The saved file keeps everything. The tower summaries, the Excel workbook and Add to Prism Library are tower only and are hidden in this mode.
+**Export.** Export, Bottom-up workbook (CSV) (text that starts with = + - @ is prefixed with an apostrophe so a spreadsheet cannot run it): team by role and year, coverage top-up, managers, contingency, grade mix, team by location, layers, net saving, activities, use cases, the existing-team check, the confidence guide and the checks. The saved file keeps everything. The tower summaries, the Excel workbook and Add to Prism Library are tower only and are hidden in this mode.
 
-**Not built yet:** a Prism Library hand-off, a feed into Stages 2 and 3, and the 24-month ramp.
+**Not built yet:** a Prism Library hand-off, a feed into Stages 2 and 3, the 24-month ramp, risk registers, skill cover by shift, and the confidence suggestions the tower derives from its towers.
 
-An example is in `docs/example-bottomup-acme.damo.json` (invented activities).
+An example is in `docs/example-bottomup-acme.damo.json` (invented activities, existing team and ratings; every qualifier on, 14.6 FTE in Year 1 falling to 13.0).
 
 ## Stage 1 · Step 1: coverage and base team
 

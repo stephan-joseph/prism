@@ -4,7 +4,7 @@
  "savedAt": "2026-11-16T00:00:00Z",
  "state": {
   "deal": "Acme Retail (bottom-up example)",
-  "active": 20,
+  "active": 1,
   "method": "bottomup",
   "bu": {
    "term": {
@@ -407,7 +407,30 @@
      "start": 2,
      "effort": null
     }
-   }
+   },
+   "coverageOn": true,
+   "backfillOn": true,
+   "contOn": true,
+   "sdmOn": true,
+   "gradesOn": true,
+   "sdmMode": "auto",
+   "tiers": {}
+  },
+  "cplx": "medium",
+  "ex": {
+   "L2": 6,
+   "L3": 4,
+   "trans": 1,
+   "gov": 1,
+   "other": 1
+  },
+  "exTol": 10,
+  "exSource": "rfp",
+  "conf": {
+   "vol": 3,
+   "sla": 4,
+   "cov": 4,
+   "cpx": 3
   }
  },
  "scenarios": []

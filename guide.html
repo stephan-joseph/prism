@@ -311,14 +311,16 @@ quiz:[
 <span class="eyebrow">A second way to size a deal</span>
 <h1>Size the deal from its activities</h1>
 <p class="lead">The tower method starts from tickets and service towers. The bottom-up method starts from the list of activities in the RFP. Each activity has hours a month, an automation lever and the roles that do the work. The team is those hours turned into FTE, year by year.</p>
-<div class="note"><b>It is a separate flow.</b> Choose it on the Documents screen (<span class="ui">Choose how to size this deal</span>) or from <span class="ui">File, Sizing method</span>. Each method keeps its own inputs, so switching deletes nothing, and the tower results do not change.</div>
-<h2>The five steps</h2>
+<div class="note"><b>It has its own engine and steps.</b> Choose it on the Documents screen (<span class="ui">Choose how to size this deal</span>) or from <span class="ui">File, Sizing method</span>. The activities, drivers, use cases and role floors belong to bottom-up alone, so switching deletes nothing. The support window, locations, complexity, contingency, manager ratio and existing team are <b>shared</b> with the tower method: enter them once, and a change in either method changes both.</div>
+<h2>The seven steps</h2>
 <div class="tbl"><table><thead><tr><th>Step</th><th>What you do</th></tr></thead><tbody>
-<tr><td>1 · Scope and drivers</td><td>Set the core term and option years, the scenario, productive hours per FTE, hypercare, the rounding step and whether AI build is a separate team. Add the volume drivers (alerts, pipelines, hosts) with their yearly growth, adjust the realisation curve, and set role floors.</td></tr>
-<tr><td>2 · RFP activities</td><td>One card per activity: tower, RFP reference, layer, driver or quantity, times a month, hours per unit, maximum lever, years, scaling, roles and the use cases behind the lever. Add from the starter library or by hand.</td></tr>
-<tr><td>3 · Use cases and automation</td><td>Switch on the use cases from the catalogue, set the year each starts and edit its build days. Hours released by each use case are shown beside it.</td></tr>
-<tr><td>4 · Roles and FTE</td><td>FTE by role for every year, what moves the team each year, and the layers and skills behind it.</td></tr>
-<tr><td>5 · Review and export</td><td>The result, 15 checks, the saving after the cost of running the AI layer, and traceability to each RFP reference. Download the bottom-up workbook as CSV.</td></tr>
+<tr><td>1 · Coverage and locations</td><td>The same screen as the tower method's Step 1: the support window, delivery locations, on-call and leave. Its "Step 1 base team" becomes the coverage floor.</td></tr>
+<tr><td>2 · Scope and drivers</td><td>Set the core term and option years, the scenario, productive hours per FTE, hypercare, the rounding step and whether AI build is a separate team. Add the volume drivers with their yearly growth, adjust the realisation curve, switch the coverage floor and backfill on or off, set each role's tier, and set role floors.</td></tr>
+<tr><td>3 · RFP activities</td><td>One card per activity: tower, RFP reference, layer, driver or quantity, times a month, hours per unit, maximum lever, years, scaling, roles and the use cases behind the lever. Add from the starter library or by hand.</td></tr>
+<tr><td>4 · Use cases and automation</td><td>Switch on the use cases from the catalogue, set the year each starts and edit its build days. Hours released by each use case are shown beside it.</td></tr>
+<tr><td>5 · Complexity, managers and grade mix</td><td>Choose the engagement complexity, which sets the contingency and the grade pyramid. Set how managers are sized. Rate the confidence drivers for an advisory contingency guide.</td></tr>
+<tr><td>6 · Roles and FTE</td><td>FTE by role for every year, then the coverage floor, grade mix, team by location, what moves the team each year, and the layers and skills behind it.</td></tr>
+<tr><td>7 · Review and export</td><td>The result, the existing-team check, 18 checks, the saving after the cost of running the AI layer, and traceability to each RFP reference. Download the bottom-up workbook as CSV.</td></tr>
 </tbody></table></div>
 <h2>The formulas</h2>
 <ul>
@@ -328,6 +330,16 @@ quiz:[
 <li><b>Scaling</b> multiplies by (1 + growth) from Year 2, using the driver's growth or the partner footprint growth. Fixed activities do not scale.</li>
 <li><b>Lever</b> = the activity's maximum lever × the share of its use cases that are switched on and live that year. An activity with a lever but no use case releases nothing.</li>
 <li><b>FTE</b> = hours a month ÷ productive hours per FTE a month, then rounded up to the step for each role, with the role's floor as a minimum.</li>
+</ul>
+<h2>Coverage, managers and contingency</h2>
+<p>These follow the tower method's own rules, in the same order. Each has a switch in step 2 or 5. A new estimate has them on. A bottom-up estimate saved before they existed has them off, so its numbers do not move.</p>
+<ul>
+<li><b>Role tiers.</b> Each role is L2, L3 or other, guessed from its name and editable. L2 and L3 roles staff the shifts. Managers and AI, data, release, security and database roles are guessed as other.</li>
+<li><b>Leave and holiday backfill</b> raises the L2 and L3 hours by each location's leave and public holidays, weighted by its share of the support window.</li>
+<li><b>Coverage floor.</b> The support window needs at least the "Step 1 base team". If the L2 and L3 roles come to less, the gap is added as L2 and L3 in the window's own ratio. It stays when automation cuts hours.</li>
+<li><b>Managers.</b> One service delivery manager per set number of delivery FTE (default 12). The default, automatic, adds it unless an activity already gives a delivery lead, so the lead is never counted twice. You can also force the ratio or take managers from the activities only.</li>
+<li><b>Contingency</b> is a percentage of the delivery team plus the manager: low 5%, medium 7.5%, high 10% in Year 1 (or your own), and the lower of that and 6% after. No complexity means no contingency.</li>
+<li><b>Grade mix</b> splits the delivery team, contingency and manager into Lead, Senior and Consultant with the complexity's pyramid. It is a view and does not change the FTE.</li>
 </ul>
 <div class="calc" id="calcBU">
   <h3>Try it: one activity from quantity to FTE</h3>
@@ -350,7 +362,7 @@ quiz:[
 <p>Step 4 splits each year's change into volume growth, more automation, activities starting or ending, hypercare ending, AI build, and floors and rounding. They add up to the change in the team.</p>
 <h2>Start from documents</h2>
 <p>With bottom-up on, <span class="ui">Extract inputs</span> also proposes the activities the RFP lists, the option years, and any use case the documents ask for. It matches each activity to a starter library entry when one fits closely and takes quantities only when the documents state them. It never estimates hours: an activity with no library match arrives with no hours and the checks flag it.</p>
-<div class="warn"><b>Limits to know</b> The starter library values, the realisation curves, the efficiency factor, hypercare, the foundation build and the catalogue effort are proposed values, not framework values. This method does not feed Stages 2 and 3 of the tower flow, has no Prism Library hand-off yet, and has no 24-month ramp. The tower summaries and Excel export are for the tower method only.</div>`},
+<div class="warn"><b>Limits to know</b> The starter library values, the realisation curves, the efficiency factor, hypercare, the foundation build and the catalogue effort are proposed values, not framework values. This method does not feed Stages 2 and 3 of the tower flow, has no Prism Library hand-off yet, no 24-month ramp, no risk registers and no skill cover by shift. The confidence guide uses your ratings only; the tower derives suggestions from its towers. The tower summaries and Excel export are for the tower method only.</div>`},
 
 {id:"s1",grp:"Stage 1 · Size the team",t:"Step 1 · Coverage",html:()=>`
 <span class="eyebrow">Stage 1 · Step 1</span>
@@ -679,6 +691,9 @@ const EXAMPLE=[
 ];
 
 const FAQ=[
+ ["Why did my bottom-up team get bigger when I turned on the coverage floor?","The support window needs a minimum number of people on duty in every hour, whatever the activity hours say. If the L2 and L3 roles from your activities come to less, the gap is added so the team can staff the window. Automation cannot take the team below it."],
+ ["I changed the support window in bottom-up and my tower estimate moved. Why?","The support window, locations, complexity, contingency, manager ratio and existing team are shared by both methods. Enter them once; a change in either method changes both."],
+ ["Is the service delivery lead counted twice?","It can be: if an activity already gives a delivery lead and managers are sized from a ratio, both count. Step 5 lets you size managers from the activities only, and a check warns when both are on."],
  ["Why did my team jump when I added a tower?","Once the work team is larger than the base team, the work sets the size. Before that, extra work is absorbed by people who are already needed to cover shifts. Look at the Step 4 verdict sentence."],
  ["The bar at the bottom shows a different number from the final estimate.","The bar shows the team after the stage you're on. It becomes the final Year 1 team once Stage 3 has added the transformation capacity (Step 13)."],
  ["Why is rounding adding so much?","People are rounded up in each location and tier (L2, L3, SDM). A small team spread over two locations can gain 2–3 people. Change rounding in Step 1 to see the effect."],
@@ -702,6 +717,9 @@ const FAQ=[
 ];
 
 const GLOSS=[
+ ["Coverage floor","In bottom-up, the smallest team that can staff the support window (the tower method's base team). The activities' L2 and L3 roles are topped up to it, and it holds when automation cuts hours."],
+ ["Role tier","Whether a bottom-up role is L2, L3 or other. L2 and L3 roles staff the shifts, count toward the coverage floor and are backfilled for leave."],
+ ["Grade mix","The delivery team, contingency and manager split into Lead, Senior and Consultant with the complexity's pyramid. A view only."],
  ["FTE","Full-time equivalent: one person working full time (40 hours a week). Part-FTE roles are shared across towers."],
  ["Base team","Step 1: the people needed to keep someone on every shift, whatever the volume."],
  ["Work team","Step 2 (and skill cover, Step 5): the people the work takes, from volumetrics or thin slices. Transformation is counted separately in Stage 3."],
