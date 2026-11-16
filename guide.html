@@ -269,6 +269,8 @@ quiz:[
 <li><div>A pasted <b>Prism Library reference sheet</b> is read directly, without the AI: its tower, tickets, coverage, term and assumptions are proposed. It describes another deal, so check each proposal.</div></li>
 <li><div>Review <span class="ui">Proposed inputs</span>, grouped by stage. Untick anything you don't agree with, then <span class="ui">Apply selected and go to Step 1</span>.</div></li>
 </ol>
+<h2>Choose how to size the deal</h2>
+<p>Below the extraction panels, <span class="ui">Choose how to size this deal</span> offers two methods: <b>Service tower based</b> (the steps in this guide) and <b>Bottom-up (activity based)</b>, which sizes from the RFP's activities. The cards show what the documents listed. You can change the choice at any time from <span class="ui">File, Sizing method</span>.</p>
 <h2>What Claude can propose</h2>
 <p>Deal name; coverage window and P1s a month; towers with who provides L1/L2/L3, SLAs, priority mix, ticket volumes (and where they're counted) or estate size, enhancements, L1.5, SRE and AIOps scope, special roles; AI adoption; complexity; term; existing team; contract clauses and the towers that serve them; assumptions, risks and open questions for the client.</p>
 <div class="note"><b>Where the inputs came from</b> Every applied input keeps its source and quote. It shows under the coverage window, on each tower card, and in Step 13's <span class="ui">Where the inputs came from</span> table. If someone edits it later it's flagged <i>edited since</i>.</div>
@@ -304,6 +306,51 @@ quiz:[
 <h2>Where clauses appear</h2>
 <p>They are saved in the estimate file, in the Excel export (a <b>Contract clauses</b> sheet) and in both summaries. Estimates saved before this screen existed open with no clauses.</p>
 <div class="tip"><b>Links are never guessed</b> Extraction links a tower only to a clause reference that exists in the list. If a link is missing, tick it yourself.</div>`},
+
+{id:"bu",grp:"Bottom-up method",t:"Bottom-up (activity based)",html:()=>`
+<span class="eyebrow">A second way to size a deal</span>
+<h1>Size the deal from its activities</h1>
+<p class="lead">The tower method starts from tickets and service towers. The bottom-up method starts from the list of activities in the RFP. Each activity has hours a month, an automation lever and the roles that do the work. The team is those hours turned into FTE, year by year.</p>
+<div class="note"><b>It is a separate flow.</b> Choose it on the Documents screen (<span class="ui">Choose how to size this deal</span>) or from <span class="ui">File, Sizing method</span>. Each method keeps its own inputs, so switching deletes nothing, and the tower results do not change.</div>
+<h2>The five steps</h2>
+<div class="tbl"><table><thead><tr><th>Step</th><th>What you do</th></tr></thead><tbody>
+<tr><td>1 · Scope and drivers</td><td>Set the core term and option years, the scenario, productive hours per FTE, hypercare, the rounding step and whether AI build is a separate team. Add the volume drivers (alerts, pipelines, hosts) with their yearly growth, adjust the realisation curve, and set role floors.</td></tr>
+<tr><td>2 · RFP activities</td><td>One card per activity: tower, RFP reference, layer, driver or quantity, times a month, hours per unit, maximum lever, years, scaling, roles and the use cases behind the lever. Add from the starter library or by hand.</td></tr>
+<tr><td>3 · Use cases and automation</td><td>Switch on the use cases from the catalogue, set the year each starts and edit its build days. Hours released by each use case are shown beside it.</td></tr>
+<tr><td>4 · Roles and FTE</td><td>FTE by role for every year, what moves the team each year, and the layers and skills behind it.</td></tr>
+<tr><td>5 · Review and export</td><td>The result, 15 checks, the saving after the cost of running the AI layer, and traceability to each RFP reference. Download the bottom-up workbook as CSV.</td></tr>
+</tbody></table></div>
+<h2>The formulas</h2>
+<ul>
+<li><b>Baseline hours a month</b> = quantity × times a month × hours per unit.</li>
+<li><b>Hours in year n</b> = baseline × scaling × (1 − lever × realisation × efficiency), only between the activity's from and to years.</li>
+<li><b>Hours released</b> = baseline × scaling × lever × realisation × efficiency.</li>
+<li><b>Scaling</b> multiplies by (1 + growth) from Year 2, using the driver's growth or the partner footprint growth. Fixed activities do not scale.</li>
+<li><b>Lever</b> = the activity's maximum lever × the share of its use cases that are switched on and live that year. An activity with a lever but no use case releases nothing.</li>
+<li><b>FTE</b> = hours a month ÷ productive hours per FTE a month, then rounded up to the step for each role, with the role's floor as a minimum.</li>
+</ul>
+<div class="calc" id="calcBU">
+  <h3>Try it: one activity from quantity to FTE</h3>
+  <div class="sub">Same formula as the tool, for one activity in one year. The tool's default efficiency is 90%.</div>
+  <div class="grid">
+    <label>Quantity<input id="buQ" type="number" min="0" value="100"></label>
+    <label>Times a month<input id="buF" type="number" min="0" value="2"></label>
+    <label>Hours per unit<input id="buH" type="number" min="0" step="0.1" value="1.4"></label>
+    <label>Maximum lever, %<input id="buL" type="number" min="0" max="100" value="50"></label>
+    <label>Realisation this year, %<input id="buR" type="number" min="0" max="100" value="30"></label>
+    <label>Efficiency, %<input id="buE" type="number" min="0" max="100" value="100"></label>
+    <label>Productive hours per FTE a month<input id="buP" type="number" min="20" value="140"></label>
+  </div>
+  <div class="out" id="buOut"></div>
+</div>
+<div class="tip"><b>A worked check</b> 100 × 2 × 1.4 = 280 hours a month. With a 50% lever, 30% realisation and 100% efficiency: 238 hours, 42 released, 1.70 FTE, which rounds up to 2.0 at a 0.5 step.</div>
+<h2>Use cases and the catalogue</h2>
+<p>The catalogue has 29 use cases with a build effort range, duration and token cost for each. Effort is the range midpoint unless you edit it. A use case costs its build days in the year it starts, plus a one-time AI foundation build in Year 1. Hours are released from the activities that tick the use case, split equally across the ones that are live. A use case that needs another (for example the monthly report needs the dashboard) is flagged if the other is off.</p>
+<h2>What moves the team each year</h2>
+<p>Step 4 splits each year's change into volume growth, more automation, activities starting or ending, hypercare ending, AI build, and floors and rounding. They add up to the change in the team.</p>
+<h2>Start from documents</h2>
+<p>With bottom-up on, <span class="ui">Extract inputs</span> also proposes the activities the RFP lists, the option years, and any use case the documents ask for. It matches each activity to a starter library entry when one fits closely and takes quantities only when the documents state them. It never estimates hours: an activity with no library match arrives with no hours and the checks flag it.</p>
+<div class="warn"><b>Limits to know</b> The starter library values, the realisation curves, the efficiency factor, hypercare, the foundation build and the catalogue effort are proposed values, not framework values. This method does not feed Stages 2 and 3 of the tower flow, has no Prism Library hand-off yet, and has no 24-month ramp. The tower summaries and Excel export are for the tower method only.</div>`},
 
 {id:"s1",grp:"Stage 1 · Size the team",t:"Step 1 · Coverage",html:()=>`
 <span class="eyebrow">Stage 1 · Step 1</span>
@@ -649,6 +696,9 @@ const FAQ=[
  ["A tower shows 'Not linked to a clause' in Step 9. What do I do?","Open Contract clauses, or the tower in Step 2, and tick the clauses it serves. If the tower serves no listed clause, leave it. It stays in the table and the total still adds up."],
  ["Where are my estimates stored?","In your browser only, until you Save file. Clearing browser data or using another browser starts fresh."],
  ["Does the SDM count as part of a tower?","No. Service Delivery Managers are sized in Step 4 at 1 per 12 delivery FTE and appear under Governance in the team by role."]
+ ["How do I choose between the tower method and bottom-up?","Use the tower method when you have ticket volumes and service towers to size from. Use bottom-up when the RFP lists the activities the supplier must perform and you want to size each one. You can switch from File, Sizing method; each method keeps its own inputs."],
+ ["Why does an activity with a lever show no saving in bottom-up?","A lever only releases hours through the use cases behind it. If the activity ticks no use case, or the use cases it ticks are switched off or start later, the lever counts as zero. Step 5 lists these under its checks."],
+ ["Why did extraction give an activity no hours?","Extraction never estimates hours. When an activity matches a starter library entry it takes that entry's proposed values; when it does not, you enter the hours."],
 ];
 
 const GLOSS=[
@@ -681,6 +731,12 @@ const GLOSS=[
  ["Deflection","Share of effort an AIOps use case removes at full adoption, combined per level and capped by a ceiling."],
  ["Confidence score","Annexure 1: nine weighted drivers scored 1–5, out of 100; bands Low / Medium / High / Highest."],
  ["[F], [P], proposed","Source tags: DAMO Solution Estimation Framework, AI_Works pricing sheet, or a value the framework doesn't give."]
+ ["Bottom-up (activity based)","The second sizing method: the team comes from the hours of each RFP activity, not from towers and tickets. It is a separate flow with its own inputs."],
+ ["Activity","One piece of work in the RFP, with a driver or quantity, hours per unit, an automation lever, roles and the use cases behind the lever."],
+ ["Driver","What activities scale with in the bottom-up method, such as alerts a month, pipelines or hosts, with a Year 1 value and a yearly growth."],
+ ["Lever","The most hours automation could remove from an activity. It is realised only through the use cases behind it, and only as fast as the realisation curve allows."],
+ ["Realisation curve","The share of each lever that is realised in each year, for the base and lean scenarios (proposed values)."],
+ ["Starter library","Generic activities by tower kind with invented hours, levers and roles, all proposed, to start an activity list from."],
 ];
 
 /* ================= calculators ================= */
@@ -708,6 +764,14 @@ function calcTw(){
    <div class="row"><span>A · ticket effort</span><span>${fmt(A,1)} h</span><div class="f">(L1 × 0.25 + L2 × 3 + L3 × 10, with SLA) ÷ 85% × (1 + coordination)</div></div>
    <div class="row"><span>B · non-ticketing effort</span><span>${fmt(B,1)} h</span></div>
    <div class="row tot"><span>Tower FTE</span><span>${fmt(fte,2)}</span><div class="f">(A + B) ÷ 160 hours a month</div></div>`;
+}
+function calcBU(){
+  const v=id=>Math.max(0,+$(id).value||0), q=v("buQ"), f=v("buF"), h=v("buH"), L=Math.min(100,v("buL"))/100, R=Math.min(100,v("buR"))/100, E=Math.min(100,v("buE"))/100, P=Math.max(20,v("buP")||140);
+  const base=q*f*h, k=L*R*E, hrs=base*(1-k), rel=base*k, fte=hrs/P, step=Math.ceil(fte/.5-1e-9)*.5;
+  $("buOut").innerHTML=`<div class="row"><span>Baseline hours a month</span><span>${fmt(base,1)} h</span><div class="f">quantity × times a month × hours per unit</div></div>
+   <div class="row"><span>Hours released</span><span>${fmt(rel,1)} h</span><div class="f">baseline × lever × realisation × efficiency = ${fmt(k*100,1)}% of the baseline</div></div>
+   <div class="row"><span>Hours after automation</span><span>${fmt(hrs,1)} h</span></div>
+   <div class="row tot"><span>FTE needed · rounded up to 0.5</span><span>${fmt(fte,2)} · ${fmt(step,1)}</span><div class="f">hours ÷ productive hours per FTE a month, then up to the step</div></div>`;
 }
 function calcSc(){
   const mod=$("scA").value==="moderate", vol=$("scV").value==="1", sc=vol?(mod?4:3):(mod?2:1);
@@ -753,7 +817,7 @@ function show(i,focus){
   if(ch.id==="example")$("exTbl").querySelector("tbody").innerHTML=EXAMPLE.map((r,k)=>`<tr><td><b>${esc(r[0])}</b></td><td class="r mono">${esc(r[1])}</td><td style="color:var(--muted);font-size:14px">${esc(r[2])}</td><td><input type="checkbox" data-ex="${k}" ${P.check["ex"+k]?"checked":""} aria-label="Matched ${esc(r[0])}"></td></tr>`).join("");
   if(ch.id==="faq"){const r=q=>{$("faqList").innerHTML=FAQ.filter(f=>!q||(f[0]+f[1]).toLowerCase().includes(q)).map(f=>`<details class="faq"><summary>${esc(f[0])}</summary><p>${esc(f[1])}</p></details>`).join("")||"<p>No matches.</p>"};r("");$("faqQ").oninput=e=>r(e.target.value.toLowerCase())}
   if(ch.id==="glossary"){const r=q=>{$("glList").innerHTML=GLOSS.filter(g=>!q||(g[0]+g[1]).toLowerCase().includes(q)).map(g=>`<div><dt>${esc(g[0])}</dt><dd>${esc(g[1])}</dd></div>`).join("")||"<p>No matches.</p>"};r("");$("glQ").oninput=e=>r(e.target.value.toLowerCase())}
-  if($("calcCov"))calcCov();if($("calcTw"))calcTw();if($("calcSc"))calcSc();if($("calcRe"))calcRe();
+  if($("calcCov"))calcCov();if($("calcTw"))calcTw();if($("calcSc"))calcSc();if($("calcRe"))calcRe();if($("calcBU"))calcBU();
   renderQuiz(ch);renderToc();
   P.last=cur;save();
   try{history.replaceState(null,"","#"+ch.id)}catch(e){}
@@ -765,12 +829,12 @@ document.addEventListener("click",e=>{
   else if(d.next){P.done[CH[cur].id]=true;save();if(cur<CH.length-1)show(cur+1,true);else renderToc()}
   else if(d.qa){const [id,qi,j]=d.qa.split(":");P.quiz[id]=P.quiz[id]||{};P.quiz[id][qi]=+j;save();renderQuiz(CH.find(c=>c.id===id))}
 });
-document.addEventListener("input",e=>{const t=e.target;if(t.closest("#calcCov"))calcCov();if(t.closest("#calcTw"))calcTw();if(t.closest("#calcSc"))calcSc();if(t.closest("#calcRe"))calcRe()});
+document.addEventListener("input",e=>{const t=e.target;if(t.closest("#calcCov"))calcCov();if(t.closest("#calcTw"))calcTw();if(t.closest("#calcSc"))calcSc();if(t.closest("#calcRe"))calcRe();if(t.closest("#calcBU"))calcBU()});
 document.addEventListener("change",e=>{const t=e.target,d=t.dataset;
   if(d.prep!=null){P.check[d.prep]=t.checked;save()}
   else if(d.ex!=null){P.check["ex"+d.ex]=t.checked;save()}
   else if(t.id==="tocSel")show(+t.value,true);
-  else if(t.closest("#calcCov"))calcCov();else if(t.closest("#calcTw"))calcTw();else if(t.closest("#calcSc"))calcSc();else if(t.closest("#calcRe"))calcRe();
+  else if(t.closest("#calcCov"))calcCov();else if(t.closest("#calcTw"))calcTw();else if(t.closest("#calcSc"))calcSc();else if(t.closest("#calcRe"))calcRe();else if(t.closest("#calcBU"))calcBU();
 });
 const fromHash=CH.findIndex(c=>"#"+c.id===location.hash);
 show(fromHash>=0?fromHash:(P.last||0),false);

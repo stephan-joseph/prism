@@ -21,7 +21,7 @@ function usageStore() {
 const MODEL = "claude-opus-5-5";
 
 export default async (req: Request, _context: Context) => {
-  let body: { jobId?: string; docs?: Doc[]; passphrase?: string };
+  let body: { jobId?: string; docs?: Doc[]; passphrase?: string; activities?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -77,7 +77,7 @@ export default async (req: Request, _context: Context) => {
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       output_config: { effort: "high" },
-      messages: [{ role: "user", content: buildExtractionPrompt(docs) }],
+      messages: [{ role: "user", content: buildExtractionPrompt(docs, { activities: body.activities === true }) }],
     });
     const message = await stream.finalMessage();
     apiMessage = message;

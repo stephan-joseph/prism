@@ -47,6 +47,18 @@ let n = 0; const ok = (m) => console.log("ok", ++n, m);
   assert.equal((await poll(s, "gw")).status, "done");
   const g = seen.at(-1); assert.equal(g.via, "plain"); assert.equal(g.req.model, "claude-sonnet-5-5");
   assert.ok(!("betas" in g.req) && !("fallbacks" in g.req) && !("output_config" in g.req)); ok("gateway: token only, plain request, chosen model"); }
+{ /* the bottom-up method asks for activities and option years; a tower extraction keeps the shorter prompt */
+  seen.length = 0;
+  const s = await setup({ ANTHROPIC_API_KEY: "k" });
+  await post(s.ext, { jobId: "tw", docs: [{ text: "x" }] }); await poll(s, "tw");
+  const tower = seen.at(-1).req.messages[0].content;
+  await post(s.ext, { jobId: "bu", activities: true, docs: [{ text: "x" }] }); await poll(s, "bu");
+  const bu = seen.at(-1).req.messages[0].content;
+  await post(s.ext, { jobId: "bu2", activities: "yes", docs: [{ text: "x" }] }); await poll(s, "bu2");
+  const loose = seen.at(-1).req.messages[0].content;
+  assert.ok(!tower.includes("activities") && !tower.includes("UC-01") && tower.includes("clauses")); ok("tower request: no activities in the prompt");
+  assert.ok(bu.includes('"activities"') && bu.includes("AMS-01 =") && bu.includes("UC-29 =") && bu.includes("optionYears") && bu.length > tower.length); ok("bottom-up request: activities, library and catalogue in the prompt");
+  assert.equal(loose, tower); ok("only a real true turns activities on"); }
 { seen.length = 0;
   const s = await setup({ ANTHROPIC_API_KEY: "k" });
   await post(s.ext, { jobId: "dir", docs: [{ text: "x" }] }); await poll(s, "dir");

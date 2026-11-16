@@ -60,7 +60,7 @@ export function extractHandler({ jobs, usage, env, makeClient, AnthropicErrors =
     await jobs.setJSON(jobId, { status: "running" });
     try {
       const client = makeClient(env);
-      const request = { model: MODEL, max_tokens: 16000, messages: [{ role: "user", content: buildExtractionPrompt(docs) }] };
+      const request = { model: MODEL, max_tokens: 16000, messages: [{ role: "user", content: buildExtractionPrompt(docs, { activities: body.activities === true }) }] };
       const stream = simple
         ? client.messages.stream(request)
         : client.beta.messages.stream({ ...request, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default", output_config: { effort: "high" } });

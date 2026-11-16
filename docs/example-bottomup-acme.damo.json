@@ -1,0 +1,414 @@
+{
+ "app": "damo-estimation-workflow",
+ "format": 1,
+ "savedAt": "2026-11-16T00:00:00Z",
+ "state": {
+  "deal": "Acme Retail (bottom-up example)",
+  "active": 20,
+  "method": "bottomup",
+  "bu": {
+   "term": {
+    "core": 3,
+    "option": 2
+   },
+   "scenario": "base",
+   "aiBuild": "separate",
+   "hpf": 140,
+   "effPct": 90,
+   "hyperPct": 10,
+   "footPct": 0,
+   "step": 0.5,
+   "foundDays": 20,
+   "drivers": [
+    {
+     "id": "d_alert",
+     "name": "Application alerts a month",
+     "value": 1200,
+     "growth": 8
+    },
+    {
+     "id": "d_inc",
+     "name": "Incidents a month",
+     "value": 220,
+     "growth": 5
+    },
+    {
+     "id": "d_sr",
+     "name": "Service requests a month",
+     "value": 150,
+     "growth": 4
+    },
+    {
+     "id": "d_chg",
+     "name": "Changes a month",
+     "value": 30,
+     "growth": 3
+    },
+    {
+     "id": "d_ialert",
+     "name": "Infrastructure alerts a month",
+     "value": 800,
+     "growth": 6
+    },
+    {
+     "id": "d_host",
+     "name": "Hosts",
+     "value": 140,
+     "growth": 0
+    },
+    {
+     "id": "d_pipe",
+     "name": "Pipelines",
+     "value": 60,
+     "growth": 10
+    },
+    {
+     "id": "d_agent",
+     "name": "Agents",
+     "value": 4,
+     "growth": 25
+    }
+   ],
+   "floors": [
+    {
+     "id": "f1",
+     "role": "Service delivery lead",
+     "fte": 1
+    }
+   ],
+   "activities": [
+    {
+     "id": "a1",
+     "tower": "AMS",
+     "name": "Monitor and triage application alerts",
+     "ref": "4.1",
+     "driver": "d_alert",
+     "qty": null,
+     "freq": 1,
+     "hpu": 0.25,
+     "lever": 40,
+     "from": 1,
+     "to": 10,
+     "scaling": "volume",
+     "role1": "L2 engineer",
+     "share1": 70,
+     "role2": "L3 engineer",
+     "layer": "run",
+     "skills": [
+      "sse"
+     ],
+     "ucs": [
+      "UC-01"
+     ],
+     "lib": "AMS-01",
+     "evidence": "",
+     "source": ""
+    },
+    {
+     "id": "a2",
+     "tower": "AMS",
+     "name": "Resolve application incidents",
+     "ref": "4.2",
+     "driver": "d_inc",
+     "qty": null,
+     "freq": 1,
+     "hpu": 1.5,
+     "lever": 25,
+     "from": 1,
+     "to": 10,
+     "scaling": "volume",
+     "role1": "L2 engineer",
+     "share1": 60,
+     "role2": "L3 engineer",
+     "layer": "run",
+     "skills": [
+      "sse"
+     ],
+     "ucs": [
+      "UC-02",
+      "UC-03",
+      "UC-04"
+     ],
+     "lib": "AMS-02",
+     "evidence": "",
+     "source": ""
+    },
+    {
+     "id": "a3",
+     "tower": "AMS",
+     "name": "Fulfil application service requests",
+     "ref": "4.3",
+     "driver": "d_sr",
+     "qty": null,
+     "freq": 1,
+     "hpu": 0.75,
+     "lever": 30,
+     "from": 1,
+     "to": 10,
+     "scaling": "volume",
+     "role1": "L2 engineer",
+     "share1": 100,
+     "role2": "",
+     "layer": "run",
+     "skills": [
+      "sse"
+     ],
+     "ucs": [
+      "UC-04"
+     ],
+     "lib": "AMS-03",
+     "evidence": "",
+     "source": ""
+    },
+    {
+     "id": "a4",
+     "tower": "AMS",
+     "name": "Problem and change management for applications",
+     "ref": "4.4",
+     "driver": "d_chg",
+     "qty": null,
+     "freq": 1,
+     "hpu": 2,
+     "lever": 15,
+     "from": 1,
+     "to": 10,
+     "scaling": "volume",
+     "role1": "Technical lead",
+     "share1": 50,
+     "role2": "L3 engineer",
+     "layer": "run",
+     "skills": [
+      "sse"
+     ],
+     "ucs": [
+      "UC-05"
+     ],
+     "lib": "AMS-04",
+     "evidence": "",
+     "source": ""
+    },
+    {
+     "id": "a5",
+     "tower": "IMS",
+     "name": "Monitor infrastructure and cloud alerts",
+     "ref": "5.1",
+     "driver": "d_ialert",
+     "qty": null,
+     "freq": 1,
+     "hpu": 0.2,
+     "lever": 45,
+     "from": 1,
+     "to": 10,
+     "scaling": "volume",
+     "role1": "L1.5 engineer",
+     "share1": 60,
+     "role2": "SRE",
+     "layer": "run",
+     "skills": [
+      "infra"
+     ],
+     "ucs": [
+      "UC-01",
+      "UC-18"
+     ],
+     "lib": "IMS-01",
+     "evidence": "",
+     "source": ""
+    },
+    {
+     "id": "a6",
+     "tower": "IMS",
+     "name": "Platform administration and patching",
+     "ref": "5.2",
+     "driver": "d_host",
+     "qty": null,
+     "freq": 1,
+     "hpu": 0.5,
+     "lever": 0,
+     "from": 1,
+     "to": 10,
+     "scaling": "volume",
+     "role1": "Platform administrator",
+     "share1": 100,
+     "role2": "",
+     "layer": "run",
+     "skills": [
+      "infra"
+     ],
+     "ucs": [],
+     "lib": "IMS-03",
+     "evidence": "",
+     "source": ""
+    },
+    {
+     "id": "a7",
+     "tower": "DMS",
+     "name": "Monitor data pipelines",
+     "ref": "6.1",
+     "driver": "d_pipe",
+     "qty": null,
+     "freq": 1,
+     "hpu": 0.5,
+     "lever": 40,
+     "from": 1,
+     "to": 10,
+     "scaling": "volume",
+     "role1": "Data engineer",
+     "share1": 100,
+     "role2": "",
+     "layer": "run",
+     "skills": [
+      "data"
+     ],
+     "ucs": [
+      "UC-01"
+     ],
+     "lib": "DMS-01",
+     "evidence": "",
+     "source": ""
+    },
+    {
+     "id": "a8",
+     "tower": "AI",
+     "name": "Evaluate and tune prompts and guardrails",
+     "ref": "7.1",
+     "driver": "d_agent",
+     "qty": null,
+     "freq": 1,
+     "hpu": 6,
+     "lever": 0,
+     "from": 1,
+     "to": 10,
+     "scaling": "volume",
+     "role1": "AI engineer",
+     "share1": 100,
+     "role2": "",
+     "layer": "aiRun",
+     "skills": [
+      "aieval"
+     ],
+     "ucs": [],
+     "lib": "AI-02",
+     "evidence": "",
+     "source": ""
+    },
+    {
+     "id": "a9",
+     "tower": "GOV",
+     "name": "Service delivery management",
+     "ref": "8.1",
+     "driver": "",
+     "qty": 1,
+     "freq": 1,
+     "hpu": 140,
+     "lever": 0,
+     "from": 1,
+     "to": 10,
+     "scaling": "fixed",
+     "role1": "Service delivery lead",
+     "share1": 100,
+     "role2": "",
+     "layer": "gov",
+     "skills": [],
+     "ucs": [],
+     "lib": "GOV-01",
+     "evidence": "",
+     "source": ""
+    },
+    {
+     "id": "a10",
+     "tower": "GOV",
+     "name": "SLA and KPI reporting",
+     "ref": "8.2",
+     "driver": "",
+     "qty": 1,
+     "freq": 1,
+     "hpu": 24,
+     "lever": 30,
+     "from": 1,
+     "to": 10,
+     "scaling": "fixed",
+     "role1": "Service delivery lead",
+     "share1": 100,
+     "role2": "",
+     "layer": "gov",
+     "skills": [],
+     "ucs": [
+      "UC-07"
+     ],
+     "lib": "GOV-02",
+     "evidence": "",
+     "source": ""
+    },
+    {
+     "id": "a11",
+     "tower": "GOV",
+     "name": "Runbook and knowledge upkeep",
+     "ref": "8.3",
+     "driver": "",
+     "qty": 1,
+     "freq": 1,
+     "hpu": 40,
+     "lever": 30,
+     "from": 1,
+     "to": 10,
+     "scaling": "fixed",
+     "role1": "Knowledge analyst",
+     "share1": 100,
+     "role2": "",
+     "layer": "ci",
+     "skills": [],
+     "ucs": [
+      "UC-24"
+     ],
+     "lib": "GOV-04",
+     "evidence": "",
+     "source": ""
+    }
+   ],
+   "uc": {
+    "UC-01": {
+     "on": true,
+     "start": 1,
+     "effort": null
+    },
+    "UC-02": {
+     "on": true,
+     "start": 1,
+     "effort": null
+    },
+    "UC-03": {
+     "on": true,
+     "start": 2,
+     "effort": null
+    },
+    "UC-04": {
+     "on": true,
+     "start": 2,
+     "effort": null
+    },
+    "UC-05": {
+     "on": true,
+     "start": 3,
+     "effort": null
+    },
+    "UC-07": {
+     "on": true,
+     "start": 2,
+     "effort": null
+    },
+    "UC-18": {
+     "on": true,
+     "start": 3,
+     "effort": null
+    },
+    "UC-24": {
+     "on": true,
+     "start": 2,
+     "effort": null
+    }
+   }
+  }
+ },
+ "scenarios": []
+}

@@ -155,6 +155,40 @@ An optional screen between Documents and Step 1. It lists the contract or RFP cl
 - **Where it appears.** The saved file keeps the clauses (`S.clauses`, and `clauseIds` on each tower). The table is in the Excel export (sheet "Contract clauses"), the printable summary and the Markdown summary. The table groups the modelled team: a proposed final number from the commercial step is not split by clause.
 - **Old estimates** open with no clauses.
 
+## Bottom-up method (activity based)
+
+A second way to size a deal, chosen on the Documents screen (**Choose how to size this deal**) or from File, Sizing method. It is a separate flow: the tower method, its steps and its results are not changed, and each method keeps its own inputs (`S.method` is `tower` or `bottomup`; the bottom-up inputs are `S.bu`). Estimates saved before the choice open as tower based.
+
+**Steps (ids 20 to 24):** 1 Scope and drivers; 2 RFP activities; 3 Use cases and automation; 4 Roles and FTE; 5 Review and export.
+
+**Formulas** (`computeBU()`), for activity a in year n between its from and to years:
+
+- baseline hours a month = quantity × times a month × hours per unit (quantity can come from a driver)
+- hours(n) = baseline × scaling(n) × (1 − lever(n) × realisation(n) × efficiency)
+- released(n) = baseline × scaling(n) × lever(n) × realisation(n) × efficiency
+- scaling(n) multiplies by (1 + growth) from Year 2: the driver's growth, the partner footprint growth, or none (fixed)
+- lever(n) = the activity's maximum lever × the share of its use cases that are on and live in year n. No use case means no release.
+- hypercare adds a share of Year 1 run hours, in Year 1 only
+- FTE = hours a month ÷ productive hours per FTE a month; each role is rounded up to the step and held at its floor
+
+**Layers:** run O&M, AI run, governance and delivery, continuous improvement, transition and hypercare, AI build, and floors and rounding. They add up to the team in both AI build modes. **AI build** is a separate team by default; the switch carries it inside the run roles in proportion to their hours. Build effort lands in each use case's start year, plus a one-time foundation build in Year 1.
+
+**Use cases:** `CATALOGUE` has 29 use cases (build effort and duration ranges, token cost, prerequisites). Effort is the range midpoint unless edited. A use case built inside another that is on (UC-08 inside UC-05 or UC-06) has no separate build days. Role names are matched ignoring case and spacing, and a role floor uses the spelling it was typed with. It is reference data for this method only; the tower method's use cases (`USECASES`) are untouched.
+
+**Year to year:** step 4 splits each year's change into volume growth, more automation, activities starting or ending, hypercare, AI build, and floors and rounding. They add up to the change.
+
+**Checks (15):** two must reconcile (role hours equal activity hours; hours released by use case equal hours released by activity). The rest warn: term not set, no activities, no hours, no first role, role split incomplete, lever without a use case, volume scaling without a driver, from year after to year, use cases switched off or unused, prerequisites off, a use case starting after the term (it is not built or counted), uncalibrated activities.
+
+**From documents.** With bottom-up on, Extract inputs also proposes `activities` (RFP reference, name, tower kind, an optional starter library match, driver and quantity when stated, use case ids from the catalogue only) and `optionYears`. Drivers are per tower, so the same driver name for AMS and IMS (alerts) never shares a quantity; a stated quantity that differs from its driver stays on the activity. The activities part of the prompt is sent only when bottom-up is on, so tower extractions keep the shorter prompt and reply. Nothing is guessed: an activity with no library match arrives with no hours and the checks flag it. An activity already listed (same reference and name) is filled in, not repeated. In tower mode the proposals show a note and activities are not applied.
+
+**Starter library.** `ACTIVITY_LIBRARY` in `extract-prompt.mjs` has 22 generic activities by tower kind (AMS, IMS, DMS, AI, governance). Every hours, lever and role value is invented and proposed. A lever is set only where a use case sits behind it. Add one from the picker on step 2.
+
+**Export.** Export, Bottom-up workbook (CSV) (text that starts with = + - @ is prefixed with an apostrophe so a spreadsheet cannot run it): team by role and year, layers, net saving, activities, use cases and checks. The saved file keeps everything. The tower summaries, the Excel workbook and Add to Prism Library are tower only and are hidden in this mode.
+
+**Not built yet:** a Prism Library hand-off, a feed into Stages 2 and 3, and the 24-month ramp.
+
+An example is in `docs/example-bottomup-acme.damo.json` (invented activities).
+
 ## Stage 1 · Step 1: coverage and base team
 
 Inputs:

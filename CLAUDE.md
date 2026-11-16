@@ -1,6 +1,6 @@
 # DAMO Prism
 
-An in-house tool that sizes managed-services deals ("Estimation as a Service"). A solution architect describes the support window, towers, volumes, SLAs and AIOps scope. Prism builds the team, the year-by-year team by role, a confidence score and an audit trail. It is built on the DAMO Solution Estimation Framework and the DAMO team pricing sheet. A companion app, **Prism Library** (separate repo `prism-library`), stores approved estimates for reuse.
+An in-house tool that sizes managed-services deals ("Estimation as a Service"). A solution architect describes the support window, towers, volumes, SLAs and AIOps scope. Prism builds the team, the year-by-year team by role, a confidence score and an audit trail. It is built on the DAMO Solution Estimation Framework and the DAMO team pricing sheet. It has two sizing methods: the **tower method** (the original) and a separate **bottom-up (activity based) method**. A companion app, **Prism Library** (separate repo `prism-library`), stores approved estimates for reuse.
 
 Read `README.md` for the full method and `guide.html` for the user guide. This file is what a new maintainer needs first.
 
@@ -16,13 +16,13 @@ Read `README.md` for the full method and `guide.html` for the user guide. This f
 
 | Path | What it is |
 |---|---|
-| `index.html` | The whole app: one self-contained file, no build step, about 5,000 lines. State is saved in the browser (`localStorage` key `damo-workflow-v2`). |
+| `index.html` | The whole app: one self-contained file, no build step, about 6,000 lines. State is saved in the browser (`localStorage` key `damo-workflow-v2`). |
 | `guide.html` | Interactive user guide with calculators that use the tool's formulas. |
 | `usage.html` | Admin report of extraction runs and cost. Off until `USAGE_ADMIN_KEY` is set. |
 | `extract-prompt.mjs` | The extraction prompt, schema and cleaning. Shared by the page and the Netlify function. |
 | `netlify/functions/` | `extract-inputs-background.mts` (AI extraction, 15-minute background function), `extract-status.mts`, `extract-usage.mts`. |
 | `lib/usage.mjs` | Prices, cost calculation and usage summary. |
-| `docs/` | `example-acme-retail.damo.json` (open it with File, Open file) and a sample summary. |
+| `docs/` | `example-acme-retail.damo.json` and `example-bottomup-acme.damo.json` (open them with File, Open file) and a sample summary. |
 | `scripts/run-selftests.py` | Runs the built-in self-tests headlessly. |
 
 ## Run and test
@@ -33,7 +33,7 @@ Open `index.html` in a browser for the calculators. Extraction needs it served o
 python3 -m http.server 8000
 ```
 
-Self-tests (the engine's checks against the framework's worked examples, plus invariants and feature tests). Expect every test to pass; the count was 123 after the contract clauses change.
+Self-tests (the engine's checks against the framework's worked examples, plus invariants and feature tests). Expect every test to pass; the count was 155 after the bottom-up method and its review fixes.
 
 ```bash
 python3 scripts/run-selftests.py
@@ -41,7 +41,7 @@ python3 scripts/run-selftests.py
 
 The same tests run in the app from the "Run checks" button in the final review step. Add a test whenever you change the engine.
 
-The clause cleaning in `extract-prompt.mjs` has its own Node checks: `node scripts/test-extract.mjs`.
+The extraction cleaning in `extract-prompt.mjs` (clauses, activities, option years), the starter activity library and the use case list have their own Node checks (17): `node scripts/test-extract.mjs`. That script also reads `index.html` to confirm the prompt's use case list and the library match `CATALOGUE` and `SKILL_CATALOG`.
 
 ## Deploy
 
@@ -70,6 +70,7 @@ Key areas in `index.html`:
 - **Extraction:** `runExtraction`, `showProposals`, `applyProposals`. A pasted Prism Library reference sheet is read directly without the AI (`isLibRef`, `parseLibraryReference`). An extracted tower of a kind you already have offers update or add (`buildTowerFromProposal`).
 - **Library hand-off:** `libraryBlock()` adds a `library` summary to saved files. File, Add to Prism Library opens the Library with the summary in the link fragment (`#import=`, base64url JSON; never sent to a server).
 - **Contract clauses:** `S.clauses` and `clauseIds` on each tower. `clauseAlloc` groups the Year 1 roles by clause (it never changes a number). Screen 15 (`renderClauses`, between Documents and Step 1, not in `ORDER`), the Step 2 selector (`clauseServedHtml`), the Team shape table (`updateClauseTable`), and `clauseSheetRows` for the exports. Extraction returns `clauses` and `towers[].clauseRefs`; `applyProposals` links by reference and never on a guess.
+- **Bottom-up method (separate flow):** `S.method` is `"tower"` (default) or `"bottomup"`; `S.bu` holds its inputs. The tower engine, `STAGES` and `USECASES` are not used by it. `BU_STAGES` (ids 20 to 24) are its steps; `stepFor` sends a step id from the other method to this method's first step. `renderNav` and `renderBar` hand over to `renderNavBU` and a hidden bar in this mode. `computeBU()` is the engine (hours, released hours, scaling, lever from live use cases, hypercare, build effort, roles, floors, rounding, year-to-year reasons, 15 checks). `CATALOGUE` is the 29-use-case catalogue (effort, duration, tokens, prerequisites), read only. `cleanBU` and `cleanActivity` repair saved inputs. Screens are `renderBU20` to `renderBU24`; edits go through `buSet` (inputs update in place, selects and list changes rebuild). The starter library `ACTIVITY_LIBRARY` and the use case list `UC_CATALOGUE` live in `extract-prompt.mjs`. Extraction returns `activities[]` and `optionYears`; `buActivityFromProposal` builds an activity from a proposal, a library entry or both, and `applyProposals` adds activities only when bottom-up is on, and switching method re-offers the proposals. Drivers are per tower (the same name for another tower gets its own driver); a quantity the documents state that differs from its driver stays on the activity. The prompt asks for activities only when the page passes `{activities:true}` (bottom-up on), which the page sends in the extraction request body. Both extraction handlers read it: `server/handlers.mjs` (the EKS server in the Docker image) and `netlify/functions/extract-inputs-background.mts`. An older server that ignores the flag never asks for activities, so ship the page and the server image together. A tower estimate's approval fingerprint ignores `method` and `bu`. `libraryBlock()` returns null in this mode. Export is a CSV (text cells that start with = + - @ get an apostrophe); the tower summaries, Excel and Library hand-off are hidden in this mode.
 - **State and migration:** `defaultsRaw`, `migrate`. Estimates saved before a feature keep their own method (see `st.prod`, `st.aiopsPf`).
 - **Start fresh setting:** File menu, per browser. When on, opening the address starts a new estimate; reloading keeps the current one.
 
@@ -83,9 +84,12 @@ Values marked `proposed` in the tool are not from the framework. Do not present 
 - Agentic autonomy factors (assist 0.5, act with approval 0.8, autonomous 1.0 of deflection; build effort 0.8, 1.0, 1.3) and 3% baseline productivity are proposed.
 - The extraction function logs usage but never stores document text.
 
+- Bottom-up values marked `proposed`: starter library hours, levers and roles (invented), realisation curves (base 30/55/75/85/90%, lean 15/30/45/55/60%), efficiency 90%, hypercare 10% of Year 1 run hours, 140 productive hours per FTE a month, 20 foundation build days, and catalogue effort at the range midpoint. Build effort lands in each use case's start year. A lever with no use case behind it releases nothing. Extraction never estimates hours.
+
 ## Open items at handoff
 
 - The Prism Library link has not been checked live end to end through the hosting sign-in.
 - Applying an extracted tower now offers update or add; keep an eye on edge cases with several towers of one kind.
 - Extraction on real documents has not been run by the previous maintainer (it needs the passphrase and a key). Run one small, non-confidential document after deploy.
+- Bottom-up has no Prism Library hand-off, no Stage 2 and 3 feed and no 24-month ramp yet. Extraction of activities has not been run on a real RFP.
 - Estimator (separate older tool) has its own extraction function with no usage logging.

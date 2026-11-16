@@ -298,6 +298,32 @@ tr:last-child td{border-bottom:0}
 .ucard b{font-family:var(--display);font-size:14px}
 .ucard span{font-size:13px;color:var(--muted)}
 .ucard .n{font:600 11px var(--mono);color:var(--faint)}
+.methodgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.mcard{display:grid;gap:6px;align-content:start;text-align:left;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;cursor:pointer}
+.mcard b{font-family:var(--display);font-size:15px}
+.mcard span{font-size:13px;color:var(--muted)}
+.mcard .mfound{font:600 12px var(--mono);color:var(--faint)}
+.mcard[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 1px var(--accent)}
+.mcard:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bufields{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.bufield{display:grid;gap:4px;align-content:start;font-size:13px;color:var(--muted)}
+.bufield small{font-size:11.5px;color:var(--faint)}
+.bufield input[type=number],.bufield select,.bufield input[type=text]{width:100%}
+.buact{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:12px;margin-bottom:12px}
+.buchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.buchips .lbl{font-size:12px;color:var(--muted);margin-right:4px}
+.buchip{display:inline-flex;gap:4px;align-items:center;border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 10px;font-size:12px;background:var(--surface-2)}
+.buchip button{border:0;background:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:0 4px}
+.buout{font-size:12.5px;color:var(--muted);font-family:var(--mono)}
+.bukpi{display:grid;gap:2px}.bukpi span{font-size:12px;color:var(--muted)}.bukpi b{font:600 22px var(--display)}
+.buchecks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.buchecks li{display:flex;gap:10px;align-items:flex-start;font-size:13.5px}
+.buchecks li small{display:block;color:var(--muted);font-size:12px}
+.buchecks .ico{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--surface-2);color:var(--muted)}
+.buchecks li.ok .ico{background:var(--add-soft);color:var(--add)}
+.buchecks li.warn .ico{background:var(--risk-soft);color:var(--risk)}
+.buchecks li.error .ico{background:var(--warn-soft);color:var(--warn)}
+tr.tot td{border-top:2px solid var(--line)}
 
 /* fixed FTE bar */
 .on-docs .fte{display:none}
@@ -549,6 +575,7 @@ tr.sel td{background:var(--accent-soft)}
           <button type="button" role="menuitem" id="openBtn">Open file…<small>Replaces the estimate on screen</small></button>
           <button type="button" role="menuitem" id="saveBtn">Save file<small>Every input, to reopen or share</small></button>
           <button type="button" role="menuitem" id="libBtn">Add to Prism Library…<small>Opens the Library with this estimate</small></button>
+          <button type="button" role="menuitem" id="methodBtn">Sizing method<small></small></button>
           <button type="button" role="menuitem" id="freshBtn" aria-pressed="false">Start fresh on every visit<small></small></button>
           <hr>
           <button type="button" role="menuitem" class="danger" id="resetBtn"><span class="r1">Reset estimate…<small>Clears every input</small></span><span class="r2" aria-hidden="true">Click again to clear everything</span></button>
@@ -557,6 +584,7 @@ tr.sel td{background:var(--accent-soft)}
       <div class="menu">
         <button class="btn primary" type="button" data-menu="exportMenu" aria-haspopup="menu" aria-expanded="false" aria-controls="exportMenu">Export<span class="car" aria-hidden="true">▾</span></button>
         <div class="menupop" id="exportMenu" role="menu" hidden>
+          <button type="button" role="menuitem" id="mBuCsv" style="display:none">Bottom-up workbook (CSV)<small>Team by role and year, layers, activities, checks</small></button>
           <button type="button" role="menuitem" id="dlBtn">Download summary<small>Deal-review pack: every step, assumptions and risks</small></button>
           <button type="button" role="menuitem" id="mCust">Customer summary<small>Team, coverage and scope for the client</small></button>
           <button type="button" role="menuitem" id="mXls">Excel workbook<small>Every step, role, location and assumption</small></button>
@@ -618,6 +646,12 @@ tr.sel td{background:var(--accent-soft)}
       </div>
     </div>
 
+    <div class="panel" id="methodPanel" style="margin-top:20px">
+      <header><h3>Choose how to size this deal</h3><span class="sub" id="methodSub"></span></header>
+      <div class="methodgrid" id="methodCards"></div>
+      <div class="hint" style="margin-top:8px">Each method keeps its own inputs. Switching does not delete either one. You can also switch from File, Sizing method.</div>
+    </div>
+
     <div class="stage-nav"><button class="btn" type="button" data-go="1">Skip to step 1</button><button class="btn primary" type="button" data-go="15">Next: contract clauses →</button></div>
   </section>
 
@@ -635,6 +669,38 @@ tr.sel td{background:var(--accent-soft)}
       <div class="hint" id="clHint" style="margin-top:8px"></div>
     </div>
     <div class="stage-nav"><button class="btn" type="button" data-go="0">← Documents</button><button class="btn primary" type="button" data-go="1">Next: step 1, coverage →</button></div>
+  </section>
+
+  <!-- ===================== BOTTOM-UP METHOD (steps 20 to 24, a separate flow from steps 1 to 14) ===================== -->
+  <section id="stage20" class="stage" aria-labelledby="s20h" hidden>
+    <div class="stage-head"><span class="eyebrow">Inputs · Step 1 of 5 · bottom-up</span><h2 id="s20h">Scope and drivers</h2>
+      <p>The term, how the numbers are scaled, the volume drivers, the realisation curve and role floors.</p></div>
+    <div id="bu20"></div>
+    <div class="stage-nav"></div>
+  </section>
+  <section id="stage21" class="stage" aria-labelledby="s21h" hidden>
+    <div class="stage-head"><span class="eyebrow">Inputs · Step 2 of 5 · bottom-up</span><h2 id="s21h">RFP activities</h2>
+      <p>Every activity in scope, with its driver, quantity, hours, automation lever, roles and the use cases behind the lever.</p></div>
+    <div id="bu21"></div>
+    <div class="stage-nav"></div>
+  </section>
+  <section id="stage22" class="stage" aria-labelledby="s22h" hidden>
+    <div class="stage-head"><span class="eyebrow">Inputs · Step 3 of 5 · bottom-up</span><h2 id="s22h">Use cases and automation</h2>
+      <p>Switch on the use cases, set when each starts and what it costs to build. They release hours from the activities that tick them.</p></div>
+    <div id="bu22"></div>
+    <div class="stage-nav"></div>
+  </section>
+  <section id="stage23" class="stage" aria-labelledby="s23h" hidden>
+    <div class="stage-head"><span class="eyebrow">Result · Step 4 of 5 · bottom-up</span><h2 id="s23h">Roles and FTE</h2>
+      <p>The team by role for every year, what moves it each year, and the layers and skills behind it.</p></div>
+    <div id="bu23"></div>
+    <div class="stage-nav"></div>
+  </section>
+  <section id="stage24" class="stage" aria-labelledby="s24h" hidden>
+    <div class="stage-head"><span class="eyebrow">Result · Step 5 of 5 · bottom-up</span><h2 id="s24h">Review and export</h2>
+      <p>The result, the checks, the saving after the cost of running the AI layer, and traceability to the RFP.</p></div>
+    <div id="bu24"></div>
+    <div class="stage-nav"></div>
   </section>
 
   <!-- ===================== STAGE 1 ===================== -->
@@ -1744,6 +1810,182 @@ const PARTS={1:"Stage 1 · Size the team",2:"Stage 2 · Qualify the team",3:"Sta
 const PARTS_SHORT={1:"Stage 1",2:"Stage 2",3:"Stage 3",4:"Review"};
 const ORDER=STAGES.map(x=>x.n);
 const STEPNO=Object.fromEntries(STAGES.map((x,i)=>[x.n,i+1]));
+
+/* ---------- bottom-up (activity based) method: a separate flow from the tower method ----------
+   It has its own steps, its own state (S.bu) and its own use case catalogue. compute(), runCompute(), STAGES and USECASES
+   are not read or changed by anything in this section. S.method chooses the flow: "tower" (default) or "bottomup". */
+const BU_STAGES=[
+  {n:20,part:1,t:"Scope and drivers",d:"The term, the volume drivers and how AI build effort is carried."},
+  {n:21,part:1,t:"RFP activities",d:"Every activity in scope, with its driver, quantity and hours."},
+  {n:22,part:1,t:"Use cases and automation",d:"The use case catalogue, and which use cases release hours from which activities."},
+  {n:23,part:2,t:"Roles and FTE",d:"Hours by role turned into FTE, year by year."},
+  {n:24,part:2,t:"Review and export",d:"Totals, checks and traceability back to the RFP."}
+];
+const BU_PARTS_SHORT={1:"Inputs",2:"Result"};
+const BU_ORDER=BU_STAGES.map(x=>x.n);
+const BU_STEPNO=Object.fromEntries(BU_STAGES.map((x,i)=>[x.n,i+1]));
+const isBU=()=>!!S&&S.method==="bottomup";
+/* the tower steps are ids 1 to 14 and the bottom-up steps are 20 to 24; Documents (0) and Contract clauses (15) are shared.
+   Any link or saved position that points at the other method's step lands on this method's first step. */
+function stepFor(n){n=+n;if(isBU())return n>=1&&n<=14?20:n;return n>=20&&n<=24?1:n}
+/* The use case catalogue. Effort is engineer-days and duration is calendar days, each as a range. Tokens are per call, [low, high].
+   requires: needs that use case deployed first. inside: built and billed as part of those use cases. tower: the matching Prism tower use case id, read only.
+   Names are generic on purpose: no client, product or team names. */
+const BU_UC=(cat,n,product,eMin,eMax,dMin,dMax,tokIn,tokOut,o)=>Object.assign({cat,n,product,effortMin:eMin,effortMax:eMax,durMin:dMin,durMax:dMax,tokIn,tokOut,requires:[],inside:[],tower:null},o||{});
+const CATALOGUE=[
+  BU_UC("UC-01","Incident triage from observability data","Chat bot",2,4,10,15,[1000,3000],[300,800],{tower:"at"}),
+  BU_UC("UC-02","Incident summarisation","Chat bot",3,5,5,10,[800,2000],[200,500],{tower:"ts"}),
+  BU_UC("UC-03","Similar incident search","Chat bot",2,4,5,10,[500,1500],[200,500],{tower:"kr"}),
+  BU_UC("UC-04","Runbook lookup","Chat bot",1,3,5,5,[500,1000],[200,400],{tower:"rb"}),
+  BU_UC("UC-05","Post-incident review generation","Chat bot",5,10,15,20,[2000,5000],[500,1500]),
+  BU_UC("UC-06","Incident executive summary","Chat bot",2,4,5,10,[1000,3000],[200,600]),
+  BU_UC("UC-07","Daily incident report","Chat bot",2,4,5,10,[1500,4000],[300,800]),
+  BU_UC("UC-08","Call notes analysis","Chat bot",1,2,2,3,null,null,{inside:["UC-05","UC-06"]}),
+  BU_UC("UC-09","Free-form operations chat","Chat bot",15,25,20,30,[3000,15000],[500,2000]),
+  BU_UC("UC-10","Incident analytics dashboard","Analytics dashboard",15,20,15,20,[1000,3000],null),
+  BU_UC("UC-11","Monthly report slide generation","Analytics dashboard",3,5,5,10,[1000,3000],null,{requires:["UC-10"]}),
+  BU_UC("UC-12","Periodic PDF report export","Analytics dashboard",1,2,2,4,null,null,{requires:["UC-10"]}),
+  BU_UC("UC-13","Ticket form AI assistant","Browser extension",5,10,10,15,[500,1500],[200,500]),
+  BU_UC("UC-14","New incident notifications","Background service",2,3,10,20,null,null),
+  BU_UC("UC-15","Knowledge base chat","Web application",25,40,30,45,[10000,30000],[600,1700]),
+  BU_UC("UC-16","Incident investigation agent","IDE agent",8,15,15,25,[3000,15000],[500,2000],{tower:"agr"}),
+  BU_UC("UC-17","Critical alert auto-triage","Background service",10,15,15,25,[500,1500],[200,500],{tower:"agt"}),
+  BU_UC("UC-18","Alert optimisation","IDE agent",3,5,5,7,[3000,10000],[500,1500],{tower:"ia"}),
+  BU_UC("UC-19","Production error diagnosis","IDE agent skill",5,10,10,15,[3000,15000],[500,2000]),
+  BU_UC("UC-20","Incident context extraction","IDE agent skill",2,4,5,10,[500,1500],[200,500]),
+  BU_UC("UC-21","Diagnosis report generation","IDE agent skill",2,4,5,7,[1000,4000],[500,1500],{requires:["UC-19"]}),
+  BU_UC("UC-22","Support evidence packet preparation","IDE agent skill",4,8,10,15,[2000,8000],[500,1500]),
+  BU_UC("UC-23","Operational knowledge query","IDE agent skill",2,3,3,5,[500,1500],[200,600],{tower:"kr"}),
+  BU_UC("UC-24","Support knowledge ingestion","IDE agent skill",2,4,5,7,[1000,4000],[500,1200],{tower:"agk"}),
+  BU_UC("UC-25","Service risk scoping","IDE agent skill",3,6,5,10,[3000,8000],[700,1500]),
+  BU_UC("UC-26","Focused observability gap review","IDE agent skill",4,8,7,12,[4000,10000],[800,1800]),
+  BU_UC("UC-27","Observability implementation planning","IDE agent skill",2,5,3,7,[2000,6000],[700,1500]),
+  BU_UC("UC-28","Service telemetry implementation","IDE agent skill",4,10,7,15,[4000,12000],[800,2000]),
+  BU_UC("UC-29","Monitoring-as-code implementation","IDE agent skill",4,8,7,12,[3000,10000],[700,1800])
+];
+const BU_TOWERS=[["AMS","Applications"],["IMS","Infrastructure"],["DMS","Data"],["AI","AIOps"],["GOV","Governance"]];
+const BU_SCALING=[["fixed","Fixed"],["volume","Grows with its driver"],["footprint","Grows with partner footprint"],["uncal","Fixed, not yet calibrated"]];
+const BU_LAYERS=[["run","Run O&M"],["aiRun","AI run"],["gov","Governance and delivery"],["ci","Continuous improvement"]];
+const BU_LAYER_NAMES={run:"Run O&M",aiRun:"AI run",gov:"Governance and delivery",ci:"Continuous improvement",transition:"Transition and hypercare",aiBuild:"AI build",cont:"Floors and rounding"};
+const BU_ROLES=["Service delivery lead","Technical lead","L1.5 engineer","L2 engineer","L3 engineer","Platform administrator","Database administrator","Data engineer","SRE","Security analyst","Release engineer","AI engineer","Knowledge analyst"];
+const BU_REAL={base:[30,55,75,85,90,90,90,90,90,90],lean:[15,30,45,55,60,60,60,60,60,60]};   /* share of an activity's automation lever realised by year: proposed */
+function buDefaults(){return {term:{core:null,option:0},scenario:"base",aiBuild:"separate",hpf:140,effPct:90,hyperPct:10,footPct:0,step:0.5,foundDays:20,drivers:[],real:{base:BU_REAL.base.slice(),lean:BU_REAL.lean.slice()},floors:[],activities:[],uc:{}}}
+const buCl=(x,lo,hi,dv)=>{const v=+x;return x!==""&&x!==null&&x!==undefined&&isFinite(v)?Math.min(hi,Math.max(lo,v)):dv};
+const buTxt=(v,n)=>String(v==null?"":v).slice(0,n||120);
+function cleanActivity(a,i){
+  a=a&&typeof a==="object"?a:{};
+  return {id:buTxt(a.id,24)||"a"+i,tower:BU_TOWERS.some(t=>t[0]===a.tower)?a.tower:"AMS",name:buTxt(a.name),ref:buTxt(a.ref,40),driver:buTxt(a.driver,24),
+    qty:a.qty===null||a.qty===undefined||a.qty===""?null:buCl(a.qty,0,1e9,0),freq:buCl(a.freq,0,1e6,1),hpu:buCl(a.hpu,0,1e5,0),lever:buCl(a.lever,0,100,0),
+    from:Math.round(buCl(a.from,1,10,1)),to:Math.round(buCl(a.to,1,10,10)),scaling:BU_SCALING.some(s=>s[0]===a.scaling)?a.scaling:"fixed",
+    role1:buTxt(a.role1,60).trim(),share1:buCl(a.share1,0,100,100),role2:buTxt(a.role2,60).trim(),layer:BU_LAYERS.some(l=>l[0]===a.layer)?a.layer:"run",
+    skills:Array.isArray(a.skills)?[...new Set(a.skills.filter(x=>typeof x==="string"))].slice(0,6):[],
+    ucs:Array.isArray(a.ucs)?[...new Set(a.ucs.filter(x=>CATALOGUE.some(c=>c.cat===x)))]:[],
+    lib:buTxt(a.lib,20),evidence:buTxt(a.evidence,300),source:buTxt(a.source,60)};
+}
+/* repairs whatever was saved for the bottom-up inputs, so a damaged or older file still opens */
+function cleanBU(b){
+  const d=buDefaults();
+  if(!b||typeof b!=="object"||Array.isArray(b))return d;
+  const t=b.term&&typeof b.term==="object"?b.term:{}, core=Math.round(+t.core), opt=Math.round(+t.option);
+  d.term={core:core>=1&&core<=10?core:null,option:opt>=0&&opt<=5?opt:0};
+  d.scenario=b.scenario==="lean"?"lean":"base";
+  d.aiBuild=b.aiBuild==="inside"?"inside":"separate";
+  d.hpf=buCl(b.hpf,20,250,140);d.effPct=buCl(b.effPct,0,100,90);d.hyperPct=buCl(b.hyperPct,0,100,10);d.footPct=buCl(b.footPct,-20,100,0);d.foundDays=buCl(b.foundDays,0,500,20);
+  d.step=[0.1,0.25,0.5,1].includes(+b.step)?+b.step:0.5;
+  const curve=(a,dv)=>Array.isArray(a)&&a.length===10?a.map((v,i)=>buCl(v,0,100,dv[i])):dv.slice();
+  d.real={base:curve(b.real&&b.real.base,BU_REAL.base),lean:curve(b.real&&b.real.lean,BU_REAL.lean)};
+  const objs=x=>Array.isArray(x)?x.filter(v=>v&&typeof v==="object"):[];
+  d.drivers=objs(b.drivers).slice(0,40).map((x,i)=>({id:buTxt(x.id,24)||"d"+i,name:buTxt(x.name,80),tower:BU_TOWERS.some(t=>t[0]===x.tower)?x.tower:"",value:buCl(x.value,0,1e9,0),growth:buCl(x.growth,-50,200,0)}));
+  d.floors=objs(b.floors).slice(0,40).map((x,i)=>({id:buTxt(x.id,24)||"f"+i,role:buTxt(x.role,60),fte:buCl(x.fte,0,50,0)}));
+  d.activities=objs(b.activities).slice(0,200).map(cleanActivity);
+  d.uc=b.uc&&typeof b.uc==="object"&&!Array.isArray(b.uc)?Object.fromEntries(Object.entries(b.uc).filter(([k,v])=>CATALOGUE.some(c=>c.cat===k)&&v&&typeof v==="object").map(([k,v])=>[k,{on:!!v.on,start:Math.round(buCl(v.start,1,10,1)),effort:v.effort===null||v.effort===undefined||v.effort===""?null:buCl(v.effort,0,1000,0)}])):{};
+  return d;
+}
+/* ---------- bottom-up engine ----------
+   Hours a month for activity a in year n, between its from and to years:
+     baseline = quantity x per month x hours per unit
+     hours(n)    = baseline x scaling(n) x (1 - lever(n) x realisation(n) x efficiency)
+     released(n) = baseline x scaling(n) x lever(n) x realisation(n) x efficiency
+   scaling(n) is the product of (1 + growth) from Year 2. lever(n) is the activity's maximum lever times the share of its use cases that are switched on and live in year n,
+   so an activity with a lever but no use case releases nothing. Hypercare adds a share of Year 1 run hours. FTE = hours a month / productive hours a month. */
+function computeBU(){
+  const b=cleanBU(S.bu), acts=b.activities, N=Math.max(1,Math.min(10,(b.term.core||1)+b.term.option));
+  const hpf=b.hpf, eff=b.effPct/100, hyp=b.hyperPct/100, dpf=hpf*12/8, curve=b.real[b.scenario];
+  const ucS=cat=>{const s=b.uc[cat]||{},c=CATALOGUE.find(x=>x.cat===cat);return {on:!!s.on,start:Math.max(1,s.start||1),effort:s.effort!=null?s.effort:(c.effortMin+c.effortMax)/2,custom:s.effort!=null}};
+  const ucs=Object.fromEntries(CATALOGUE.map(c=>[c.cat,ucS(c.cat)])), ucOn=CATALOGUE.filter(c=>ucs[c.cat].on), ucIn=ucOn.filter(c=>ucs[c.cat].start<=N);
+  const drv=a=>b.drivers.find(x=>x.id===a.driver);
+  const idx=(a,n)=>{const g=a.scaling==="volume"?(drv(a)?drv(a).growth:0):a.scaling==="footprint"?b.footPct:0;let f=1;for(let k=2;k<=n;k++)f*=1+g/100;return f};
+  const baseOf=a=>(a.qty!=null?a.qty:(drv(a)?drv(a).value:0))*a.freq*a.hpu;
+  const live=(a,n)=>a.ucs.filter(c=>ucs[c].on&&ucs[c].start<=n);
+  const active=(a,n)=>n>=a.from&&n<=Math.min(a.to,N);
+  const lev=(a,n)=>a.ucs.length?a.lever/100*live(a,n).length/a.ucs.length:0;
+  const real=n=>(curve[Math.min(n,10)-1]||0)/100;
+  const B=Object.fromEntries(acts.map(a=>[a.id,baseOf(a)]));
+  const roleSeen=new Map(), canon=n=>{const t=String(n||"").trim().replace(/\s+/g," ");if(!t)return "Unassigned";const k=t.toLowerCase();if(!roleSeen.has(k))roleSeen.set(k,t);return roleSeen.get(k)};
+  const floors={};b.floors.forEach(f=>{if(String(f.role).trim()){const r=canon(f.role);floors[r]=Math.max(floors[r]||0,f.fte)}});
+  const years=[];
+  for(let n=1;n<=N;n++){
+    const y={n,real:real(n),act:{},layers:{run:0,aiRun:0,gov:0,ci:0,transition:0},ucRel:{},roles:{},skills:{},released:0};
+    acts.forEach(a=>{
+      const on=active(a,n), ix=idx(a,n), L=lev(a,n), k=L*real(n)*eff, bs=B[a.id];
+      const h=on?bs*ix*(1-k):0, rel=on?bs*ix*k:0, hy=(n===1&&a.layer==="run")?h*hyp:0;
+      y.act[a.id]={on,ix,L,k,hours:h,released:rel,hyper:hy,base:bs};
+      y.layers[a.layer]+=h;y.layers.transition+=hy;y.released+=rel;
+      const lv=live(a,n);if(lv.length&&rel>0)lv.forEach(c=>{y.ucRel[c]=(y.ucRel[c]||0)+rel/lv.length});
+      const tot=h+hy, r1=canon(a.role1), r2=a.role2?canon(a.role2):r1, s1=a.share1/100;
+      y.roles[r1]=(y.roles[r1]||0)+tot*s1;y.roles[r2]=(y.roles[r2]||0)+tot*(1-s1);
+      const sk=a.skills.length?a.skills:["unassigned"];sk.forEach(s=>{y.skills[s]=(y.skills[s]||0)+tot/sk.length});
+    });
+    /* a use case built inside another that is on has no separate build days; one that starts after the term is not built in it */
+    y.buildDays=ucIn.reduce((s,c)=>s+(ucs[c.cat].start===n&&!c.inside.some(p=>ucs[p].on)?ucs[c.cat].effort:0),0)+(n===1&&ucIn.length?b.foundDays:0);
+    y.buildFte=y.buildDays/dpf;
+    const runH=Object.values(y.roles).reduce((s,v)=>s+v,0), buildH=y.buildFte*hpf;
+    y.rh=Object.assign({},y.roles);
+    if(b.aiBuild==="inside"&&buildH>0){if(runH>0)Object.keys(y.roles).forEach(r=>{y.rh[r]=y.roles[r]+buildH*y.roles[r]/runH});else y.rh[canon("AI engineer")]=(y.rh[canon("AI engineer")]||0)+buildH}
+    years.push(y);
+  }
+  const roleList=[...new Set([...years.flatMap(y=>Object.keys(y.rh)),...Object.keys(floors)])];
+  years.forEach((y,i)=>{
+    y.req={};y.prop={};
+    roleList.forEach(r=>{const q=(y.rh[r]||0)/hpf;y.req[r]=q;y.prop[r]=Math.max(floors[r]||0,q>1e-9?Math.ceil(q/b.step-1e-9)*b.step:0)});
+    y.runProp=roleList.reduce((s,r)=>s+y.prop[r],0);
+    y.sepBuild=b.aiBuild==="separate"?y.buildFte:0;
+    y.total=y.runProp+y.sepBuild;
+    y.layerFte={run:y.layers.run/hpf,aiRun:y.layers.aiRun/hpf,gov:y.layers.gov/hpf,ci:y.layers.ci/hpf,transition:y.layers.transition/hpf,aiBuild:y.buildFte};
+    y.cont=y.total-Object.values(y.layerFte).reduce((s,v)=>s+v,0);
+    y.releasedFte=y.released/hpf;y.aiRunFte=y.layers.aiRun/hpf;y.netFte=y.releasedFte-y.aiRunFte;
+    if(i>0){
+      const p=years[i-1];let growth=0,auto=0,scope=0;
+      acts.forEach(a=>{const pa=p.act[a.id],ca=y.act[a.id];
+        if(pa.on!==ca.on)scope+=ca.hours-pa.hours;
+        else if(ca.on){growth+=pa.base*(ca.ix-pa.ix)*(1-pa.k);auto+=ca.base*ca.ix*(pa.k-ca.k)}});
+      const hyper=Object.values(y.act).reduce((s,v)=>s+v.hyper,0)-Object.values(p.act).reduce((s,v)=>s+v.hyper,0);
+      y.move=[["growth","Volume growth",growth/hpf],["auto","More automation",auto/hpf],["scope","Activities starting or ending",scope/hpf],["hyper","Hypercare",hyper/hpf],["build","AI build",y.buildFte-p.buildFte],["cont","Floors and rounding",y.cont-p.cont]];
+    }
+  });
+  /* checks */
+  const checks=[], add=(k,lvl,ok,text,detail)=>checks.push({k,lvl,ok,text,detail:detail||""});
+  const sum=f=>years.reduce((s,y)=>s+f(y),0), vsum=o=>Object.values(o).reduce((s,v)=>s+v,0);
+  const hRole=sum(y=>vsum(y.roles)), hAct=sum(y=>Object.values(y.act).reduce((s,v)=>s+v.hours+v.hyper,0));
+  add("roles","error",Math.abs(hRole-hAct)<=1e-6*Math.max(1,hAct),"Role hours equal activity hours",`${fmt(hRole,1)} and ${fmt(hAct,1)} hours a month, added over the term`);
+  const hUc=sum(y=>vsum(y.ucRel)), hRel=sum(y=>y.released);
+  add("uc","error",Math.abs(hUc-hRel)<=1e-6*Math.max(1,hRel),"Hours released by use case equal hours released by activity",`${fmt(hUc,1)} and ${fmt(hRel,1)} hours a month, added over the term`);
+  const nm=a=>a.name||a.ref||a.id, list=f=>acts.filter(f).map(nm).slice(0,4).join(", ");
+  add("term","warn",!!b.term.core,"The contract term is set",b.term.core?"":"One year is used until you set it");
+  add("any","warn",acts.length>0,"There is at least one activity",acts.length?"":"Add the RFP activities in step 2");
+  add("hours","warn",!acts.some(a=>B[a.id]<=0),"Every activity has hours",list(a=>B[a.id]<=0));
+  add("role","warn",!acts.some(a=>!a.role1.trim()),"Every activity has a first role",list(a=>!a.role1.trim()));
+  add("split","warn",!acts.some(a=>a.share1<100&&!a.role2),"Every role split adds up",list(a=>a.share1<100&&!a.role2)+(acts.some(a=>a.share1<100&&!a.role2)?": the rest goes to the first role":""));
+  add("lever","warn",!acts.some(a=>a.lever>0&&!a.ucs.length),"Every lever has a use case behind it",list(a=>a.lever>0&&!a.ucs.length)+(acts.some(a=>a.lever>0&&!a.ucs.length)?": it releases nothing":""));
+  add("drv","warn",!acts.some(a=>a.scaling==="volume"&&!drv(a)),"Every volume-scaled activity has a driver",list(a=>a.scaling==="volume"&&!drv(a)));
+  add("span","warn",!acts.some(a=>a.from>a.to),"Every activity starts before it ends",list(a=>a.from>a.to));
+  add("off","info",!acts.some(a=>a.ucs.some(c=>!ucs[c].on)),"Every use case an activity relies on is switched on",list(a=>a.ucs.some(c=>!ucs[c].on)));
+  add("unused","warn",!ucOn.some(c=>!acts.some(a=>a.ucs.includes(c.cat))),"Every switched-on use case releases hours from an activity",ucOn.filter(c=>!acts.some(a=>a.ucs.includes(c.cat))).map(c=>c.cat).join(", ")+(ucOn.some(c=>!acts.some(a=>a.ucs.includes(c.cat)))?": its build effort is counted but it releases nothing":""));
+  add("req","warn",!ucOn.some(c=>c.requires.some(r=>!ucs[r].on)),"Every prerequisite use case is switched on",ucOn.filter(c=>c.requires.some(r=>!ucs[r].on)).map(c=>c.cat+" needs "+c.requires.filter(r=>!ucs[r].on).join(", ")).join("; "));
+  add("late","warn",!ucOn.some(c=>ucs[c.cat].start>N),"Every switched-on use case starts within the term",ucOn.filter(c=>ucs[c.cat].start>N).map(c=>c.cat+" starts in Year "+ucs[c.cat].start).join(", ")+(ucOn.some(c=>ucs[c.cat].start>N)?": it is not built or counted":""));
+  add("uncal","info",!acts.some(a=>a.scaling==="uncal"),"No activity is marked not yet calibrated",acts.filter(a=>a.scaling==="uncal").length+" activities are fixed and not yet calibrated");
+  return {N,hpf,dpf,years,roleList,acts,B,ucs,ucOn,checks,ok:checks.filter(c=>c.lvl==="error").every(c=>c.ok),b};
+}
 const COV_PRESETS=[["8x5",5,8],["16x5",5,16],["24x5",5,24],["8x7",7,8],["16x7",7,16],["24x7",7,24]];
 /* proposed defaults, not from [F]/[P] */
 const LOC_CATALOG=[
@@ -1896,7 +2138,7 @@ function defaults(){
 function defaultsRaw(){
   return {
     aiopsPf:{mode:"portfolio",from:1},aiBuildOnly:true,
-    deal:"",active:0,
+    deal:"",active:0,method:"tower",bu:buDefaults(),
     region:"eu",custLoc:"c_uk",days:5,hours:24,start:0,tz:0,fteHours:40,util1:85,minSenior:1,weekendMode:"active",support:"active",prod:{on:true,pct:12,from:2,base:3},oncall1:15,ocMode:"flat",p1PerMonth:null,p1Hours:3,standby:10,
     perShift:{L2:1,L3:1},
     locations:[pickLoc("in"),pickLoc("ro")],
@@ -2043,6 +2285,8 @@ function migrate(p){
         n.clauseIds=Array.isArray(t.clauseIds)?t.clauseIds.filter(x=>typeof x==="string"):[];return n});
       /* contract clauses: estimates saved before this feature have none */
       st.clauses=cleanClauses(p.clauses);
+      /* sizing method: estimates saved before the choice are tower based and have no bottom-up inputs */
+      st.method=p.method==="bottomup"?"bottomup":"tower";st.bu=cleanBU(p.bu);
       st.meta=Object.assign(defaults().meta,p.meta||{});
       st.adj=Object.assign(defaults().adj,(p.adj&&typeof p.adj==="object")?p.adj:{});if(!Array.isArray(st.adj.y))st.adj.y=[];if(!st.adj.mit||typeof st.adj.mit!=="object")st.adj.mit={};if(!Array.isArray(st.adj.extra))st.adj.extra=[];
       st.cm=Object.assign(defaults().cm,(p.cm&&typeof p.cm==="object")?p.cm:{});["histMonths","ceiling"].forEach(k=>{if(st.cm[k]===""||st.cm[k]===undefined||isNaN(+st.cm[k]))st.cm[k]=null});if(["unknown","yes","no"].indexOf(st.cm.baseline)<0)st.cm.baseline="unknown";if(["low","medium","high"].indexOf(st.cm.pressure)<0)st.cm.pressure="medium";
@@ -2075,6 +2319,7 @@ function migrateCoverage(st,p){
 /* fingerprint of every input, so an approval can tell when the numbers under it change */
 function inputsHash(){
   const o=Object.assign({},S);delete o.meta;delete o.active;
+  if(o.method!=="bottomup"){delete o.method;delete o.bu}   /* a tower estimate's fingerprint is the same as before the method choice existed, so an earlier approval stays valid */
   o.cov=Object.fromEntries(Object.entries(S.cov||{}).filter(([,v])=>v.shifts.length||v.people!==1||(v.p&&Object.keys(v.p).length)));
   const str=JSON.stringify(o);let h=5381;for(let i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))|0;
   return (h>>>0).toString(36)+str.length.toString(36);
@@ -3120,6 +3365,107 @@ function runSelfTests(){
     const noClause=withState(testState(st=>{st.towers=[amsTower(100)]}),R=>R.total), withClause=withState(testState(st=>{const t=amsTower(100,{clauseIds:["x"]});st.towers=[t];st.clauses=[{id:"x",ref:"1",obligation:"",target:"",source:"",evidence:""}]}),R=>R.total);
     add("Clause links never change the team total","the same estimate with and without clauses",`${fmt(noClause,3)} and ${fmt(withClause,3)} FTE`,near(noClause,withClause,1e-9),"invariant");
   }
+  /* bottom-up method (phase 1): the choice of method, its saved state and the catalogue. None of these may change a tower result. */
+  {
+    const base=()=>JSON.parse(JSON.stringify(testState(st=>{st.towers=[amsTower(100)]})));
+    const old=base();delete old.method;delete old.bu;
+    const m0=migrate(old);
+    add("Bottom-up: an estimate saved before the method choice opens as tower based","method tower, with empty bottom-up inputs",`${m0.method}, ${m0.bu.activities.length} activities`,m0.method==="tower"&&Array.isArray(m0.bu.activities)&&!m0.bu.activities.length&&m0.bu.aiBuild==="separate","migration");
+    const bad=base();bad.method="x";bad.bu="junk";
+    const m1=migrate(bad);
+    const dmg=base();dmg.method="bottomup";dmg.bu={term:{core:99,option:-3},aiBuild:"x",activities:"no",uc:{"UC-01":{on:true},bogus:{on:true}}};
+    const m2=migrate(dmg);
+    add("Bottom-up: damaged method or inputs are repaired on open","unknown method becomes tower; out-of-range term, bad lists and unknown use cases are dropped",`${m1.method}; core ${m2.bu.term.core}, option ${m2.bu.term.option}, ${m2.bu.activities.length} activities, uc ${Object.keys(m2.bu.uc).join()}`,m1.method==="tower"&&Array.isArray(m1.bu.activities)&&m2.method==="bottomup"&&m2.bu.term.core===null&&m2.bu.term.option===0&&m2.bu.aiBuild==="separate"&&Array.isArray(m2.bu.activities)&&!m2.bu.activities.length&&Object.keys(m2.bu.uc).join()==="UC-01","migration");
+    const tw=withState(testState(st=>{st.towers=[amsTower(100)]}),R=>[R.total,R.p1.total]);
+    const bu=withState(testState(st=>{st.towers=[amsTower(100)];st.method="bottomup";st.bu.activities=[{id:"a1"}];st.bu.uc={"UC-01":{on:true}}}),R=>[R.total,R.p1.total]);
+    add("Bottom-up: the method and its inputs never change the tower result","the same towers give the same Year 1 team and Stage 1 team in either method",`${fmt(tw[0],3)} / ${fmt(tw[1],3)} and ${fmt(bu[0],3)} / ${fmt(bu[1],3)} FTE`,near(tw[0],bu[0],1e-9)&&near(tw[1],bu[1],1e-9),"invariant");
+    const sh=testState(st=>{st.towers=[amsTower(100)]});   /* one state object: tower ids are random, so two builds would never hash alike */
+    const h1=withState(sh,()=>inputsHash());
+    sh.bu.activities=[{id:"a1"}];const h2=withState(sh,()=>inputsHash());
+    sh.method="bottomup";const h3=withState(sh,()=>inputsHash());
+    add("Bottom-up: a tower estimate keeps the same approval fingerprint","bottom-up inputs do not change a tower estimate's fingerprint, so an earlier approval stays valid; switching method does",`${h1===h2?"same":"changed"} with bottom-up inputs, ${h1===h3?"same":"changed"} after switching`,h1===h2&&h1!==h3,"invariant");
+    const ids=CATALOGUE.map(c=>c.cat), has=id=>ids.includes(id);
+    const okIds=ids.length===29&&new Set(ids).size===29&&ids.every((id,i)=>id==="UC-"+String(i+1).padStart(2,"0"));
+    const okLinks=CATALOGUE.every(c=>c.requires.every(has)&&c.inside.every(has)&&(c.tower==null||USECASES.some(u=>u.id===c.tower)));
+    const okRanges=CATALOGUE.every(c=>c.effortMin>0&&c.effortMin<=c.effortMax&&c.durMin>0&&c.durMin<=c.durMax&&(!c.tokIn||c.tokIn[0]<=c.tokIn[1])&&(!c.tokOut||c.tokOut[0]<=c.tokOut[1]));
+    add("Bottom-up: the use case catalogue is complete and consistent","29 use cases, UC-01 to UC-29, links point at real entries, ranges run low to high",`${ids.length} entries; ids ${okIds?"ok":"wrong"}, links ${okLinks?"ok":"broken"}, ranges ${okRanges?"ok":"wrong"}`,okIds&&okLinks&&okRanges,"proposed");
+    const sf=m=>withState(testState(st=>{st.method=m}),()=>[stepFor(5),stepFor(0),stepFor(15),stepFor(22),stepFor(23)].join());
+    add("Bottom-up: a step from the other method lands on this method's first step","tower: 5,0,15,1,1 · bottom-up: 20,0,15,22,23",`tower: ${sf("tower")} · bottom-up: ${sf("bottomup")}`,sf("tower")==="5,0,15,1,1"&&sf("bottomup")==="20,0,15,22,23","invariant");
+  }
+  /* bottom-up engine (phase 2): worked numbers, all invented. 100 units x 2 a month x 1.4 h = 280 h a month; 140 productive hours per FTE a month. */
+  {
+    const act=o=>Object.assign({id:uid(),tower:"AMS",name:"x",qty:null,freq:1,hpu:1,lever:0,from:1,to:10,scaling:"fixed",role1:"L2 engineer",share1:100,role2:"",layer:"run",skills:[],ucs:[]},o);
+    const run=(mod,exact)=>withState(testState(st=>{st.method="bottomup";Object.assign(st.bu,{effPct:100,hyperPct:0,step:0.5,term:{core:3,option:0}},exact||{});mod(st.bu)}),()=>computeBU());
+    const A=act({id:"A",qty:100,freq:2,hpu:1.4,lever:50,ucs:["UC-01"]}), on1={"UC-01":{on:true,start:1,effort:null}};
+    const r1=run(b=>{b.activities=[A];b.uc=on1});
+    const h=r1.years.map(y=>y.act.A.hours), rl=r1.years.map(y=>y.act.A.released);
+    add("Bottom-up: hours and hours released follow the formulas by year","280 h baseline, lever 50%, realisation 30/55/75%: hours 238, 203, 175; released 42, 77, 105",`hours ${h.map(x=>fmt(x,1)).join(", ")}; released ${rl.map(x=>fmt(x,1)).join(", ")}`,near(h[0],238,1e-6)&&near(h[1],203,1e-6)&&near(h[2],175,1e-6)&&near(rl[0],42,1e-6)&&near(rl[1],77,1e-6)&&near(rl[2],105,1e-6),"[W] Sizing sheet formulas");
+    add("Bottom-up: FTE is hours divided by productive hours, then rounded up to the step","238 h ÷ 140 = 1.70 required, 2.0 at a 0.5 step; Year 2 is 1.45 and 1.5",`${fmt(r1.years[0].req["L2 engineer"],2)} → ${fmt(r1.years[0].prop["L2 engineer"],2)}; ${fmt(r1.years[1].req["L2 engineer"],2)} → ${fmt(r1.years[1].prop["L2 engineer"],2)}`,near(r1.years[0].req["L2 engineer"],1.7,1e-9)&&near(r1.years[0].prop["L2 engineer"],2)&&near(r1.years[1].prop["L2 engineer"],1.5),"proposed");
+    const G=act({id:"G",qty:10,freq:10,hpu:1.4,scaling:"volume",driver:"d1",role1:"Technical lead"}), F=act({id:"F",qty:10,freq:10,hpu:1.4,scaling:"footprint",role1:"Technical lead"});
+    const r2=run(b=>{b.drivers=[{id:"d1",name:"Alerts",value:0,growth:10}];b.activities=[G,F]},{footPct:5});
+    add("Bottom-up: volume and partner footprint scaling compound from Year 2","140 h at 10% growth: 140, 154, 169.4; at 5% footprint: 140, 147, 154.35",`${r2.years.map(y=>fmt(y.act.G.hours,2)).join(", ")}; ${r2.years.map(y=>fmt(y.act.F.hours,2)).join(", ")}`,near(r2.years[2].act.G.hours,169.4,1e-6)&&near(r2.years[1].act.G.hours,154,1e-6)&&near(r2.years[2].act.F.hours,154.35,1e-6),"[W] Sizing sheet formulas");
+    const C=act({id:"C",qty:100,freq:1,hpu:1,lever:40,ucs:["UC-01","UC-02"]});
+    const r3=run(b=>{b.activities=[C];b.uc={"UC-01":{on:true,start:1,effort:null},"UC-02":{on:true,start:2,effort:null}}});
+    add("Bottom-up: released hours are split across the use cases that are live","Year 1 only UC-01 is live (lever 20%): 6 h to UC-01. Year 2 both are live (lever 40%, 55%): 22 h split 11 and 11",`Y1 ${fmt(r3.years[0].ucRel["UC-01"],1)} / ${fmt(r3.years[0].ucRel["UC-02"]||0,1)}; Y2 ${fmt(r3.years[1].ucRel["UC-01"],1)} / ${fmt(r3.years[1].ucRel["UC-02"],1)}`,near(r3.years[0].ucRel["UC-01"],6,1e-6)&&!r3.years[0].ucRel["UC-02"]&&near(r3.years[1].ucRel["UC-01"],11,1e-6)&&near(r3.years[1].ucRel["UC-02"],11,1e-6)&&r3.ok,"invariant");
+    const N0=act({id:"N",qty:100,freq:1,hpu:1,lever:50}), r4=run(b=>{b.activities=[N0];b.uc=on1});
+    add("Bottom-up: a lever with no use case behind it releases nothing and is flagged","hours stay at 100 and the lever check fails",`${fmt(r4.years[0].act.N.hours,1)} h; lever check ${r4.checks.find(c=>c.k==="lever").ok?"passes":"fails"}`,near(r4.years[0].act.N.hours,100,1e-9)&&r4.years[0].act.N.released===0&&!r4.checks.find(c=>c.k==="lever").ok,"proposed");
+    const W=act({id:"W",qty:100,freq:1,hpu:1,from:2,to:3}), r5=run(b=>{b.activities=[W]},{term:{core:3,option:1}});
+    add("Bottom-up: an activity counts only between its from and to years","from Year 2 to Year 3 of a 4-year term: 0, 100, 100, 0; the move into Year 2 is scope",`${r5.years.map(y=>fmt(y.act.W.hours,0)).join(", ")}; ${r5.N} years`,r5.N===4&&r5.years.map(y=>Math.round(y.act.W.hours)).join()==="0,100,100,0"&&near(r5.years[1].move.find(m=>m[0]==="scope")[2],100/140,1e-9),"invariant");
+    const H=act({id:"H",qty:140,freq:1,hpu:1}), r6=run(b=>{b.activities=[H]},{hyperPct:10});
+    add("Bottom-up: hypercare adds a share of Year 1 run hours and ends in Year 2","140 h, 10%: 14 h of hypercare in Year 1 (154 h of role hours), none after",`${fmt(r6.years[0].act.H.hyper,1)} h; role hours ${fmt(r6.years[0].roles["L2 engineer"],1)} then ${fmt(r6.years[1].roles["L2 engineer"],1)}`,near(r6.years[0].act.H.hyper,14,1e-9)&&near(r6.years[0].roles["L2 engineer"],154,1e-9)&&near(r6.years[1].roles["L2 engineer"],140,1e-9)&&near(r6.years[1].move.find(m=>m[0]==="hyper")[2],-14/140,1e-9),"proposed");
+    const S2=act({id:"S",qty:100,freq:1,hpu:1,role1:"L2 engineer",share1:70,role2:"L3 engineer"}), r7=run(b=>{b.activities=[S2];b.floors=[{id:"f1",role:"Service delivery lead",fte:2}]});
+    add("Bottom-up: a role split shares the hours, and a floor holds a role up","70/30 split of 100 h; a floor of 2.0 for a role with no hours; role hours equal activity hours",`${fmt(r7.years[0].roles["L2 engineer"],0)}/${fmt(r7.years[0].roles["L3 engineer"],0)} h; lead ${fmt(r7.years[0].prop["Service delivery lead"],1)} FTE (needs ${fmt(r7.years[0].req["Service delivery lead"],1)})`,near(r7.years[0].roles["L2 engineer"],70,1e-9)&&near(r7.years[0].roles["L3 engineer"],30,1e-9)&&near(r7.years[0].prop["Service delivery lead"],2)&&r7.years[0].req["Service delivery lead"]===0&&r7.checks.find(c=>c.k==="roles").ok,"proposed");
+    const bothModes=["separate","inside"].map(m=>run(b=>{b.activities=[A,G];b.drivers=[{id:"d1",name:"Alerts",value:0,growth:10}];b.uc={"UC-01":{on:true,start:1,effort:null},"UC-05":{on:true,start:2,effort:10}}},{aiBuild:m}));
+    const layersOk=bothModes.every(r=>r.years.every(y=>near(Object.values(y.layerFte).reduce((s,v)=>s+v,0)+y.cont,y.total,1e-9)&&y.cont>=-1e-9));
+    add("Bottom-up: layers plus floors and rounding add up to the team in both AI build modes","separate and inside: the layer FTE and the floors and rounding line equal the total every year",bothModes.map(r=>r.b.aiBuild+" "+r.years.map(y=>fmt(y.total,2)).join("/")).join("; "),layersOk&&bothModes[0].years[0].sepBuild>0&&bothModes[1].years.every(y=>y.sepBuild===0),"invariant");
+    const sepR=bothModes[0], insR=bothModes[1];
+    add("Bottom-up: AI build effort lands in each use case's start year, with a shared foundation in Year 1","UC-01 (3 days, Year 1) + 20 foundation days = 23 days in Year 1; UC-05 (10 days) in Year 2; ÷ 210 days per FTE",`${sepR.years.map(y=>fmt(y.buildDays,0)).join(", ")} days; ${fmt(sepR.years[0].buildFte,4)} FTE in Year 1`,near(sepR.years[0].buildDays,23)&&near(sepR.years[1].buildDays,10)&&near(sepR.years[2].buildDays,0)&&near(sepR.years[0].buildFte,23/210,1e-9),"proposed");
+    const mv=bothModes.every(r=>r.years.slice(1).every((y,i)=>near(y.move.reduce((s,m)=>s+m[2],0),y.total-r.years[i].total,1e-9)));
+    add("Bottom-up: the reasons for each year's change add up to the change","growth, automation, scope, hypercare, AI build and rounding sum to the move in the team, every year, in both modes",mv?"sum matches":"sum differs",mv,"invariant");
+    const AR=act({id:"R",qty:10,freq:1,hpu:1,layer:"aiRun",role1:"AI engineer"}), r8=run(b=>{b.activities=[A,AR];b.uc=on1});
+    add("Bottom-up: the cost of running the AI layer is netted against the hours released","released 42 h, AI run 10 h: net 32 h = 0.23 FTE in Year 1",`${fmt(r8.years[0].released,0)} − ${fmt(r8.years[0].layers.aiRun,0)} h = ${fmt(r8.years[0].netFte,3)} FTE`,near(r8.years[0].netFte,32/140,1e-9),"proposed");
+    add("Bottom-up: the term is the core years plus the option years, and an empty estimate computes","3 + 2 = 5 years; no activities gives zero FTE and no error",`${run(b=>{},{term:{core:3,option:2}}).N} years; empty ${fmt(run(b=>{b.term={core:null,option:0}}).years[0].total,1)} FTE`,run(b=>{},{term:{core:3,option:2}}).N===5&&run(b=>{b.term={core:null,option:0}}).years[0].total===0,"invariant");
+  }
+  /* bottom-up from documents and the starter library (phase 3). A made-up library entry stands in for the real one, which loads from a module. */
+  {
+    const L={id:"T-01",kind:"AMS",name:"Test alerts",layer:"run",driver:"Alerts a month",hpu:0.25,lever:40,role1:"L2 engineer",share1:70,role2:"L3 engineer",ucs:["UC-01"],skills:["sse"],scaling:"volume",qty:null};
+    const bu=buDefaults(), a1=buActivityFromProposal(bu,{name:"Monitor alerts",rfpRef:"4.1",towerKind:"AMS",driver:"Alerts a month",quantity:1000,evidence:"q",source:"RFP"},L);
+    add("Bottom-up from documents: a library match gives hours, roles and a driver; the document gives the quantity","1000 alerts a month at 0.25 h = 250 h; 70/30 L2 and L3; use case UC-01; reference and source kept",`${bu.drivers.length} driver at ${bu.drivers[0].value}; ${a1.hpu} h; ${a1.role1}/${a1.role2}; ${a1.ucs.join()}; ref ${a1.ref}, ${a1.source}`,bu.drivers.length===1&&bu.drivers[0].value===1000&&a1.driver===bu.drivers[0].id&&a1.qty===null&&a1.hpu===0.25&&a1.lever===40&&a1.share1===70&&a1.ucs.join()==="UC-01"&&a1.ref==="4.1"&&a1.source==="RFP"&&a1.lib==="T-01","proposed");
+    const a2=buActivityFromProposal(bu,{name:"Triage",driver:"alerts a month",quantity:5,useCaseIds:["UC-02","UC-99"]},L);
+    add("Bottom-up from documents: a driver is reused by name, keeps its value, and document use cases win","same driver, still 1000; use cases from the document (UC-02) replace the library's, unknown ids dropped",`${bu.drivers.length} driver at ${bu.drivers[0].value}; ${a2.ucs.join()}`,bu.drivers.length===1&&bu.drivers[0].value===1000&&a2.driver===a1.driver&&a2.ucs.join()==="UC-02","invariant");
+    const bare=buDefaults(), a3=buActivityFromProposal(bare,{name:"Odd task",quantity:30},null);
+    const hrs=withState(testState(st=>{st.method="bottomup";st.bu=Object.assign(bare,{activities:[a3]})}),()=>computeBU());
+    add("Bottom-up from documents: no library match means no invented hours, and the check says so","quantity 30 kept, hours 0, 'every activity has hours' fails",`qty ${a3.qty}, ${a3.hpu} h per unit; hours check ${hrs.checks.find(c=>c.k==="hours").ok?"passes":"fails"}`,a3.qty===30&&a3.hpu===0&&a3.lever===0&&!hrs.checks.find(c=>c.k==="hours").ok,"proposed");
+    const fromLib=buDefaults(), a4=buActivityFromProposal(fromLib,{},L);
+    fromLib.drivers[0].value=1000;fromLib.term={core:3,option:0};fromLib.activities=[a4];fromLib.uc={"UC-01":{on:true,start:1,effort:null}};
+    const r4=withState(testState(st=>{st.method="bottomup";st.bu=fromLib}),()=>computeBU());
+    add("Bottom-up from the library: an entry added by hand computes like any activity","1000 × 0.25 h = 250 h baseline; lever 40% × 30% realisation × 90% efficiency releases 27 h",`${fmt(r4.years[0].act[a4.id].base,0)} h; released ${fmt(r4.years[0].act[a4.id].released,1)} h`,near(r4.years[0].act[a4.id].base,250,1e-9)&&near(r4.years[0].act[a4.id].released,27,1e-9),"[W] Sizing sheet formulas");
+    const mg=mergeExtractions({activities:[{rfpRef:"1",name:"A"}],optionYears:{value:1}},{activities:[{rfpRef:" 1 ",name:"a  "},{rfpRef:"2",name:"B"}],optionYears:{value:3}});
+    add("Bottom-up from documents: merging two extractions keeps each activity once and the first option years","A and B once each; option years 1",`${mg.activities.map(a=>a.name).join(", ")}; ${mg.optionYears.value}`,mg.activities.length===2&&mg.activities[1].name==="B"&&mg.optionYears.value===1,"invariant");
+    const kept=migrate(Object.assign(JSON.parse(JSON.stringify(testState(st=>{}))),{bu:{activities:[{id:"z",name:"n",lib:"T-01",evidence:"quote",source:"RFP"}]}}));
+    add("Bottom-up from documents: where an activity came from survives saving and opening","library entry, quote and source are kept",`${kept.bu.activities[0].lib}, ${kept.bu.activities[0].source}, ${kept.bu.activities[0].evidence}`,kept.bu.activities[0].lib==="T-01"&&kept.bu.activities[0].source==="RFP"&&kept.bu.activities[0].evidence==="quote","migration");
+  }
+  /* review fixes: drivers per tower, late starts, use cases built inside another, role names, spreadsheet-safe export, Library block */
+  {
+    const mkL=(kind,id)=>({id,kind,name:"T "+kind,layer:"run",driver:"Alerts a month",hpu:0.25,lever:0,role1:"L2 engineer",share1:100,role2:"",ucs:[],skills:[],scaling:"volume",qty:null});
+    const bu=buDefaults(), ams=buActivityFromProposal(bu,{name:"App alerts",quantity:1200},mkL("AMS","T-A")), ims=buActivityFromProposal(bu,{name:"Infra alerts",quantity:800},mkL("IMS","T-I"));
+    const dA=bu.drivers.find(d=>d.id===ams.driver), dI=bu.drivers.find(d=>d.id===ims.driver);
+    const rd=withState(testState(st=>{st.method="bottomup";Object.assign(st.bu,{term:{core:1,option:0},activities:[ams,ims],drivers:bu.drivers})}),()=>computeBU());
+    add("Bottom-up review: each tower gets its own driver, so a shared name never shares a quantity","1,200 AMS and 800 IMS alerts a month are two drivers; each activity sizes from its own: 300 h and 200 h",`${bu.drivers.map(d=>d.name+" = "+d.value).join("; ")}; ${fmt(rd.years[0].act[ams.id].base,0)} h and ${fmt(rd.years[0].act[ims.id].base,0)} h`,bu.drivers.length===2&&dA&&dI&&dA!==dI&&dA.value===1200&&dI.value===800&&near(rd.years[0].act[ams.id].base,300,1e-9)&&near(rd.years[0].act[ims.id].base,200,1e-9),"invariant");
+    const ams2=buActivityFromProposal(bu,{name:"More app alerts",quantity:300},mkL("AMS","T-A"));
+    add("Bottom-up review: a stated quantity that differs from its driver stays on the activity","same driver, no new driver, quantity 300 kept on the activity",`${bu.drivers.length} drivers; qty ${ams2.qty}`,ams2.driver===ams.driver&&ams2.qty===300&&bu.drivers.length===2,"invariant");
+    const base1=o=>withState(testState(st=>{st.method="bottomup";Object.assign(st.bu,{effPct:100,hyperPct:0,term:{core:3,option:0}},o)}),()=>computeBU());
+    const late=base1({activities:[cleanActivity({id:"A",qty:100,freq:1,hpu:1,lever:50,role1:"L2 engineer",ucs:["UC-01"]})],uc:{"UC-01":{on:true,start:5,effort:null}}});
+    add("Bottom-up review: a use case that starts after the term is neither built nor live, and is flagged","3-year term, start Year 5: no build days, nothing released, the check fails",`${late.years.map(y=>fmt(y.buildDays,0)).join("/")} days; released ${late.years.map(y=>fmt(y.released,0)).join("/")}; check ${late.checks.find(c=>c.k==="late").ok?"passes":"fails"}`,late.years.every(y=>y.buildDays===0&&y.released===0)&&!late.checks.find(c=>c.k==="late").ok,"invariant");
+    const days=ons=>base1({term:{core:2,option:0},uc:Object.fromEntries(ons.map(k=>[k,{on:true,start:1,effort:null}]))}).years[0].buildDays;
+    const dBoth=days(["UC-05","UC-08"]), dFive=days(["UC-05"]), dEight=days(["UC-08"]);
+    add("Bottom-up review: a use case built inside another has no separate build days","UC-05 (7.5) + 20 foundation = 27.5 either way; UC-08 alone is 1.5 + 20 = 21.5",`${fmt(dBoth,1)}, ${fmt(dFive,1)}, ${fmt(dEight,1)}`,near(dBoth,27.5,1e-9)&&near(dFive,27.5,1e-9)&&near(dEight,21.5,1e-9),"proposed");
+    const rr=base1({term:{core:1,option:0},floors:[{id:"f",role:"L2 Engineer",fte:2}],activities:[cleanActivity({id:"a",qty:70,freq:1,hpu:1,role1:"L2 engineer "}),cleanActivity({id:"b",qty:70,freq:1,hpu:1,role1:"l2  engineer"})]});
+    add("Bottom-up review: role names that differ only by case or spacing are one role, and the floor applies","one role named as the floor spells it, 140 h = 1.0 FTE needed, held at the floor of 2.0",`${rr.roleList.join("|")}: needs ${fmt(rr.years[0].req[rr.roleList[0]],2)}, proposed ${fmt(rr.years[0].prop[rr.roleList[0]],2)}`,rr.roleList.length===1&&rr.roleList[0]==="L2 Engineer"&&near(rr.years[0].req["L2 Engineer"],1)&&near(rr.years[0].prop["L2 Engineer"],2),"invariant");
+    const row=buCsvRow(["=SUM(1)","-0.50","a,b","@x","ok"]);
+    add("Bottom-up review: the CSV export cannot run as a formula, and keeps plain numbers","text starting = or @ gets an apostrophe; -0.50 and commas are untouched",row,row==="'=SUM(1),-0.50,\"a,b\",'@x,ok","invariant");
+    add("Bottom-up review: a bottom-up estimate writes no tower summary for the Library","the Library block is empty in bottom-up and present in tower",`bottom-up ${withState(testState(st=>{st.method="bottomup"}),()=>libraryBlock())===null?"null":"filled"}`,withState(testState(st=>{st.method="bottomup"}),()=>libraryBlock())===null,"invariant");
+  }
   return out;
 }
 function renderTests(){
@@ -3248,6 +3594,7 @@ function stepStatus(id){
 }
 let NAVHTML="";
 function renderNav(){
+  if(isBU())return renderNavBU();
   const cur=ORDER.includes(S.active)?S.active:0, curPart=cur===0?0:(STAGES.find(x=>x.n===cur)||{}).part;
   const stat=Object.fromEntries(ORDER.map(id=>[id,stepStatus(id)]));
   const partOf=p=>STAGES.filter(x=>x.part===p);
@@ -3284,11 +3631,356 @@ function fixStages(){
     nav.innerHTML=`${prev?`<button class="btn" type="button" data-go="${prev.n}">← ${esc(prev.t)}</button>`:`<button class="btn" type="button" data-go="0">← Documents</button>`}<span class="row" style="gap:8px">${extra}${next?`<button class="btn primary" type="button" data-go="${next.n}">Next: ${esc(next.t.toLowerCase())} →</button>`:""}</span>`;
   });
 }
+/* bottom-up navigation: same markup and classes as the tower navigation, driven by BU_STAGES */
+function buStepStatus(id){
+  const r=buR();
+  if(id===20)return S.bu.term.core?["ok","Ready"]:["todo","Set the contract term (one year is used until you do)"];
+  if(id===21)return S.bu.activities.length?["ok","Ready"]:["todo","Add the RFP activities"];
+  if(id===22)return r.ucOn.length?["ok",`${r.ucOn.length} use ${r.ucOn.length===1?"case":"cases"} switched on`]:["opt","Optional: switch on use cases to release hours"];
+  if(id===23)return S.bu.activities.length?["ok","Ready"]:["todo","Add activities in step 2 to see the team"];
+  return !r.ok?["warn","A total does not reconcile"]:r.checks.some(c=>!c.ok&&c.lvl==="warn")?["warn","Some checks need a look"]:["ok","All checks pass"];
+}
+function renderNavBU(){
+  const cur=BU_ORDER.includes(S.active)?S.active:0, curPart=cur===0?0:BU_STAGES.find(x=>x.n===cur).part;
+  const stat=Object.fromEntries(BU_ORDER.map(id=>[id,buStepStatus(id)]));
+  const partOf=p=>BU_STAGES.filter(x=>x.part===p);
+  const ready=p=>partOf(p).filter(x=>["ok","opt","info"].includes(stat[x.n][0])).length;
+  const tab=(p,label,long,fig,sub)=>`<button type="button" class="ptab ${curPart===p?"on":""}" role="tab" aria-selected="${curPart===p}" data-go="${partOf(p)[0].n}"><span class="pl">${label}<span class="lg"> · ${long}</span></span><span class="pf"><b>${fig}</b><span>${sub}</span></span></button>`;
+  const nAct=S.bu.activities.length;
+  let tabs=`<button type="button" class="ptab ${curPart===0?"on":""}" role="tab" aria-selected="${curPart===0}" data-go="0"><span class="pl">Step 0</span><span class="pf"><b style="font-size:14px;font-family:var(--body)">Documents</b><span>optional</span></span></button>`;
+  tabs+=tab(1,"Inputs","Scope and activities",`${nAct} ${nAct===1?"activity":"activities"}`,`${ready(1)} of ${partOf(1).length} ready`);
+  tabs+=tab(2,"Result","Roles, FTE and review",nAct?`${fmt(buR().years[0].total,1)} FTE`:"–",nAct?"Year 1":"add activities");
+  const list=curPart?partOf(curPart):[], pos=BU_ORDER.indexOf(cur);
+  const chips=list.map(x=>{const st=stat[x.n], on=x.n===cur;return `<button type="button" class="schip ${on?"on":""}" data-go="${x.n}" ${on?'aria-current="step"':""} title="${esc(st[1]?x.t+": "+st[1]:x.t)}"><span class="n">${BU_STEPNO[x.n]}</span>${esc(x.t)}<span class="st ${st[0]}" aria-hidden="true"></span><span class="sr" style="position:absolute;left:-9999px">${esc(st[1])}</span></button>`}).join("");
+  const where=cur===0?(S.active===15?"Optional: list the contract clauses and link them to towers":"Optional: let Claude propose inputs"):curPart===1?`Step ${list.findIndex(x=>x.n===cur)+1} of ${list.length} · bottom-up: scope, the RFP activities and the use cases that automate them`:`Step ${list.findIndex(x=>x.n===cur)+1} of ${list.length} · bottom-up: the team that the hours need, and the checks`;
+  const prev=pos>0?BU_ORDER[pos-1]:null, next=pos>=0&&pos<BU_ORDER.length-1?BU_ORDER[pos+1]:null, nm=id=>(BU_STAGES.find(x=>x.n===id)||{}).t||"Documents";
+  const pn=`${cur===0?(S.active===15?`<button type="button" class="btn sm" data-go="0" aria-label="Documents">←<span class="tx"> Documents</span></button>`:""):prev!=null?`<button type="button" class="btn sm" data-go="${prev}" aria-label="Previous step: ${esc(nm(prev))}">←<span class="tx"> Previous</span></button>`:`<button type="button" class="btn sm" data-go="0" aria-label="Documents">←<span class="tx"> Documents</span></button>`}${cur===0?(S.active===15?`<button type="button" class="btn sm primary" data-go="20">Step 1<span class="tx"> · Scope and drivers</span> →</button>`:`<button type="button" class="btn sm primary" data-go="15">Clauses<span class="tx"> · optional</span> →</button>`):next!=null?`<button type="button" class="btn sm primary" data-go="${next}" aria-label="Next step: ${esc(nm(next))}"><span class="tx">Next </span>→</button>`:""}`;
+  const html=tabs+"\u0001"+chips+"\u0001"+where+"\u0001"+pn+"\u0001"+cur;
+  if(html===NAVHTML)return;
+  const keepScroll=$("stepChips").scrollLeft, sameTab=NAVHTML.split("\u0001")[4]===String(cur);
+  NAVHTML=html;
+  $("partTabs").innerHTML=tabs;$("partTabs").setAttribute("role","tablist");
+  $("stepChips").innerHTML=chips;$("stepWhere").textContent=where;$("stepPrevNext").innerHTML=pn;
+  const on=$("stepChips").querySelector(".schip.on");
+  if(on&&!sameTab)on.scrollIntoView({inline:"center",block:"nearest"});else $("stepChips").scrollLeft=keepScroll;
+}
+function fixStagesBU(){
+  BU_ORDER.forEach((n,i)=>{
+    const sec=$("stage"+n); if(!sec)return;
+    const prev=i>0?BU_STAGES[i-1]:null, next=i<BU_ORDER.length-1?BU_STAGES[i+1]:null, st=BU_STAGES[i];
+    const eb=sec.querySelector(".stage-head .eyebrow"); if(eb)eb.textContent=`${BU_PARTS_SHORT[st.part]} · Step ${i+1} of ${BU_ORDER.length} · bottom-up`;
+    const nav=sec.querySelector(".stage-nav"); if(!nav)return;
+    nav.innerHTML=`${prev?`<button class="btn" type="button" data-go="${prev.n}">← ${esc(prev.t)}</button>`:`<button class="btn" type="button" data-go="0">← Documents</button>`}<span class="row" style="gap:8px">${next?`<button class="btn primary" type="button" data-go="${next.n}">Next: ${esc(next.t)} →</button>`:""}</span>`;
+  });
+}
 function renderRail(){
-  fixStages();NAVHTML="";renderNav();
+  S.active=stepFor(S.active);
+  if(isBU())fixStagesBU();else fixStages();
+  NAVHTML="";renderNav();
   document.querySelectorAll(".stage").forEach(sec=>{sec.hidden=sec.id!=="stage"+S.active});
 }
-function go(n){S.active=n;if(R)renderBar();if(n===2)renderS2();if(n===15){renderClauses();update();}if(n===3){renderS3();update();}if(n===4){renderS4();update();}if(n===5){renderS5();update();}if(n===6){renderS6();update();}if(n===7){renderS7();update();}if(n===8||n===9||n===10){renderS8();update();}if(n===11||n===12){renderS5();update();}if(n===13||n===14){update();}renderRail();save();window.scrollTo({top:0,behavior:"auto"})}
+/* the sizing method: tower based (the original flow) or bottom-up. Each keeps its own inputs, so switching deletes nothing */
+function setMethod(m){
+  if((m!=="tower"&&m!=="bottomup")||S.method===m)return;
+  S.method=m;
+  if(S.active!==0&&S.active!==15)S.active=m==="bottomup"?20:1;
+  renderAll();go(S.active);
+  if(XRESULT)showProposals(XRESULT);   /* the proposals differ by method: activities are offered only in bottom-up */
+  toast(m==="bottomup"?"Bottom-up (activity based) is on. Your tower inputs are kept.":"Service tower based is on. Your bottom-up inputs are kept.");
+}
+function renderMethod(){
+  if(!$("methodCards"))return;
+  const nT=S.towers.length, nA=S.bu.activities.length, cur=S.method;
+  const xT=XRESULT&&XRESULT.towers?XRESULT.towers.length:0, xA=XRESULT&&XRESULT.activities?XRESULT.activities.length:0;
+  const found=(n,w1,wn)=>XRESULT?` · the documents list ${n} ${n===1?w1:wn}`:"";
+  const card=(m,title,text,found)=>`<button type="button" class="mcard" data-method="${m}" aria-pressed="${cur===m}"><b>${title}</b><span>${text}</span><span class="mfound">${found}</span></button>`;
+  $("methodCards").innerHTML=card("tower","Service tower based","Sizes each service tower from tickets, volumes and SLAs, then qualifies the team and adds transformation. Needs the support window, towers and volumes.",(nT?`${nT} ${nT===1?"tower":"towers"} in this estimate`:"No towers yet")+found(xT,"tower","towers"))
+    +card("bottomup","Bottom-up (activity based)","Sizes every RFP activity from its driver, quantity and hours, then releases hours by use case. Needs the activity list and the volume drivers.",(nA?`${nA} ${nA===1?"activity":"activities"} in this estimate`:"No activities yet")+found(xA,"activity","activities"));
+  $("methodSub").textContent=cur==="bottomup"?"Bottom-up is on":"Service tower based is on";
+  /* the tower summaries and the Library hand-off read the tower build-up; the bottom-up method has its own export */
+  [["dlBtn",1],["mCust",1],["mXls",1],["copyBtn",1],["libBtn",1],["mBuCsv",0]].forEach(([id,tw])=>{const el=$(id);if(el)el.style.display=(tw?isBU():!isBU())?"none":""});
+  const b=$("methodBtn");if(b)b.innerHTML=`Sizing method: ${cur==="bottomup"?"Bottom-up":"Service tower"}<small>Switch to ${cur==="bottomup"?"service tower based":"bottom-up (activity based)"}</small>`;
+}
+/* ---------- bottom-up: activities from the starter library and from documents ----------
+   The library lives in extract-prompt.mjs (window.DamoExtract), so the prompt and the page use the same entries. */
+const buLib=()=>(window.DamoExtract&&window.DamoExtract.ACTIVITY_LIBRARY)||[];
+/* a driver by name, found or created; a stated quantity fills a driver that has none yet */
+function buDriver(bu,name,value,tower){
+  const k=String(name||"").trim().toLowerCase();if(!k)return null;
+  const same=(d,n)=>String(d.name).trim().toLowerCase()===n.toLowerCase();
+  const base=String(name).trim().slice(0,80);
+  let d=bu.drivers.find(x=>same(x,k)&&(!x.tower||x.tower===tower));
+  if(!d&&bu.drivers.some(x=>same(x,k))){
+    /* the same driver name is already used by another tower (for example alerts for AMS and for IMS): each tower gets its own, so its quantity and growth are its own */
+    const alt=`${base} (${tower})`;
+    d=bu.drivers.find(x=>same(x,alt));
+    if(!d){d={id:uid(),name:alt.slice(0,80),tower,value:value!=null?value:0,growth:0};bu.drivers.push(d)}
+  }else if(!d){d={id:uid(),name:base,tower,value:value!=null?value:0,growth:0};bu.drivers.push(d)}
+  if(value!=null&&!(d.value>0))d.value=value;
+  if(!d.tower)d.tower=tower;
+  return d;
+}
+/* An activity from a starter library entry L, a document proposal x, or both. A use case named in the document wins over the library's;
+   hours, lever, roles and skills from the library are proposed values for the architect to edit. Never guesses: no library entry means no hours. */
+function buActivityFromProposal(bu,x,L){
+  x=x||{};
+  const o={id:uid(),tower:x.towerKind||(L&&L.kind)||"AMS",name:x.name||(L&&L.name)||"",ref:x.rfpRef||"",evidence:x.evidence||"",source:x.source||""};
+  if(L)Object.assign(o,{layer:L.layer,freq:1,hpu:L.hpu,lever:L.lever,scaling:L.scaling,role1:L.role1,share1:L.share1,role2:L.role2,skills:L.skills.slice(),qty:L.qty,lib:L.id});
+  o.ucs=x.useCaseIds&&x.useCaseIds.length?x.useCaseIds.slice():(L?L.ucs.slice():[]);
+  const dn=x.driver||(L&&L.driver);
+  if(dn){
+    const d=buDriver(bu,dn,x.quantity,o.tower);o.driver=d.id;
+    /* a quantity the documents state that differs from the driver's value stays on this activity, so it is never dropped */
+    o.qty=x.quantity!=null&&d.value!==x.quantity?x.quantity:null;
+  }
+  else if(x.quantity!=null)o.qty=x.quantity;
+  return cleanActivity(o);
+}
+const buKey=a=>[a.ref,a.name].map(v=>String(v||"").trim().toLowerCase().replace(/\s+/g," ")).join("|");
+
+/* ---------- bottom-up screens (steps 20 to 24) ---------- */
+let BUC=null,BUK="";
+function buR(){const k=JSON.stringify(S.bu);if(!BUC||k!==BUK){BUK=k;BUC=computeBU()}return BUC}
+const buN=(f,id,v,o)=>{o=o||{};return `<input type="number" class="${o.cls||"w-s"}" data-bu="${f}"${id!=null?` data-bid="${esc(id)}"`:""}${o.i!=null?` data-bi="${o.i}"`:""} min="${o.min!=null?o.min:0}"${o.max!=null?` max="${o.max}"`:""} step="${o.step||"any"}" value="${v==null?"":esc(v)}" aria-label="${esc(o.label||f)}"${o.ph?` placeholder="${esc(o.ph)}"`:""}>`};
+const buT=(f,id,v,o)=>{o=o||{};return `<input type="text" data-bu="${f}"${id!=null?` data-bid="${esc(id)}"`:""} value="${esc(v||"")}" aria-label="${esc(o.label||f)}"${o.list?` list="${o.list}"`:""}${o.ph?` placeholder="${esc(o.ph)}"`:""} style="${o.w?"width:"+o.w:"width:100%"}">`};
+const buS=(f,id,v,opts,label)=>`<select data-bu="${f}"${id!=null?` data-bid="${esc(id)}"`:""} aria-label="${esc(label||f)}">${opts.map(([k,t])=>`<option value="${esc(k)}"${String(k)===String(v)?" selected":""}>${esc(t)}</option>`).join("")}</select>`;
+const buF=(label,inner,hint)=>`<label class="bufield"><span>${esc(label)}</span>${inner}${hint?`<small>${esc(hint)}</small>`:""}</label>`;
+const buYearOpts=n=>Array.from({length:n},(_,i)=>[i+1,"Year "+(i+1)]);
+const buSg=v=>Math.abs(v)<0.005?"–":(v>0?"+":"−")+fmt(Math.abs(v),2);
+const buSkill=id=>id==="unassigned"?"Unassigned":((SKILL_CATALOG.find(k=>k.id===id)||{}).name||id);
+function buKeepFocus(fn){
+  const a=document.activeElement, d=a&&a.dataset&&a.dataset.bu?a.dataset:null;
+  fn();
+  if(d){const el=document.querySelector(`[data-bu="${d.bu}"]${d.bid!=null?`[data-bid="${CSS.escape(d.bid)}"]`:""}${d.bi!=null?`[data-bi="${d.bi}"]`:""}`);if(el)el.focus()}
+}
+function renderBU20(r){
+  const b=S.bu;
+  const years=Array.from({length:r.N},(_,i)=>i);
+  $("bu20").innerHTML=`<div class="panel"><header><h3>Term and method</h3><span class="sub">${r.N} ${r.N===1?"year":"years"} modelled</span></header>
+    <div class="bufields">
+      ${buF("Core term",buS("term.core",null,b.term.core==null?"":b.term.core,[["","Not set"]].concat(buYearOpts(10).map(([k])=>[k,k+(k===1?" year":" years")])),"Core term"),"From the RFP")}
+      ${buF("Option years",buS("term.option",null,b.term.option,[0,1,2,3,4,5].map(k=>[k,String(k)]),"Option years"),"Extension years modelled after the core term")}
+      ${buF("Scenario",buS("scenario",null,b.scenario,[["base","Base"],["lean","Lean"]],"Scenario"),"Chooses the realisation curve below")}
+      ${buF("Productive hours per FTE a month",buN("hpf",null,b.hpf,{min:20,max:250,label:"Productive hours per FTE a month"}),"Proposed")}
+      ${buF("Efficiency factor, %",buN("effPct",null,b.effPct,{max:100,label:"Efficiency factor"}),"How much of the lever holds in practice. Proposed")}
+      ${buF("Hypercare, % of Year 1 run hours",buN("hyperPct",null,b.hyperPct,{max:100,label:"Hypercare percent"}),"Extra effort in Year 1 only. Proposed")}
+      ${buF("Partner footprint growth, % a year",buN("footPct",null,b.footPct,{min:-20,max:100,label:"Partner footprint growth"}),"For activities that grow with the footprint")}
+      ${buF("Round FTE up to a step of",buS("step",null,b.step,[[0.1,"0.1"],[0.25,"0.25"],[0.5,"0.5"],[1,"1"]],"Rounding step"),"Applied to each role, every year")}
+      ${buF("AI build effort",buS("aiBuild",null,b.aiBuild,[["separate","Separate build team"],["inside","Carried inside the run roles"]],"AI build effort"),"Separate shows build FTE as its own line")}
+      ${buF("AI foundation build, engineer-days",buN("foundDays",null,b.foundDays,{max:500,label:"AI foundation build days"}),"Built once in Year 1 when any use case is on. Proposed")}
+    </div></div>
+    <div class="panel"><header><h3>Volume drivers</h3><span class="sub">${b.drivers.length} ${b.drivers.length===1?"driver":"drivers"}</span></header>
+      <div class="hint" style="margin-bottom:8px">A driver is something the activities scale with, such as sources, pipelines or alerts. An activity can take its quantity from a driver and grow with it.</div>
+      ${b.drivers.length?`<div class="loc-table"><table><thead><tr><th>Driver</th><th class="r">Year 1 value</th><th class="r">Growth a year, %</th><th></th></tr></thead><tbody>${b.drivers.map(d=>`<tr><td>${buT("drv.name",d.id,d.name,{label:"Driver name",ph:"For example, Alerts a month"})}</td><td class="r">${buN("drv.value",d.id,d.value,{label:"Driver value"})}</td><td class="r">${buN("drv.growth",d.id,d.growth,{min:-50,max:200,label:"Driver growth"})}</td><td class="r"><button type="button" class="btn ghost sm" data-burm="drv:${esc(d.id)}">Remove</button></td></tr>`).join("")}</tbody></table></div>`:""}
+      <div class="row" style="margin-top:8px"><button type="button" class="btn sm" data-buadd="drv">+ Add a driver</button></div></div>
+    <div class="panel"><header><h3>Realisation of the automation lever</h3><span class="sub">${b.scenario==="lean"?"Lean":"Base"} scenario is in use</span></header>
+      <div class="hint" style="margin-bottom:8px">The share of each activity's lever that is realised in each year, as a percent. Proposed values, not from the framework.</div>
+      <div class="loc-table"><table><thead><tr><th>Scenario</th>${years.map(i=>`<th class="r">Year ${i+1}</th>`).join("")}</tr></thead><tbody>${["base","lean"].map(s=>`<tr><td>${s==="base"?"Base":"Lean"}</td>${years.map(i=>`<td class="r">${buN("real",s,b.real[s][i],{i,max:100,label:s+" realisation year "+(i+1)})}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>
+    <div class="panel"><header><h3>Role floors</h3><span class="sub">${b.floors.length} ${b.floors.length===1?"floor":"floors"}</span></header>
+      <div class="hint" style="margin-bottom:8px">The least FTE a role may have in any year, even when its hours need less.</div>
+      ${b.floors.length?`<div class="loc-table"><table><thead><tr><th>Role</th><th class="r">Minimum FTE</th><th></th></tr></thead><tbody>${b.floors.map(f=>`<tr><td>${buT("floor.role",f.id,f.role,{label:"Role",list:"buRoles",ph:"Choose or type a role"})}</td><td class="r">${buN("floor.fte",f.id,f.fte,{max:50,label:"Minimum FTE"})}</td><td class="r"><button type="button" class="btn ghost sm" data-burm="floor:${esc(f.id)}">Remove</button></td></tr>`).join("")}</tbody></table></div>`:""}
+      <div class="row" style="margin-top:8px"><button type="button" class="btn sm" data-buadd="floor">+ Add a floor</button></div></div>
+    <datalist id="buRoles">${BU_ROLES.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`;
+}
+function renderBU21(r){
+  const b=S.bu, dOpts=[["","No driver"]].concat(b.drivers.map(d=>[d.id,d.name||"(unnamed driver)"])), yo=buYearOpts(10);
+  const lib=buLib(), libSel=lib.length?`<select data-bu="libadd" aria-label="Add an activity from the starter library"><option value="">+ From the starter library</option>${BU_TOWERS.map(([k,t])=>{const g=lib.filter(l=>l.kind===k);return g.length?`<optgroup label="${k} · ${t}">${g.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join("")}</optgroup>`:""}).join("")}</select>`:"";
+  const card=a=>`<div class="buact" data-bact="${esc(a.id)}">
+    <div class="row" style="justify-content:space-between;gap:10px;flex-wrap:nowrap">${buT("act.name",a.id,a.name,{label:"Activity name",ph:"Activity name"})}<button type="button" class="btn ghost sm" data-burm="act:${esc(a.id)}" aria-label="Remove ${esc(a.name||"activity")}">Remove</button></div>
+    <div class="bufields">
+      ${buF("Tower",buS("act.tower",a.id,a.tower,BU_TOWERS.map(t=>[t[0],t[0]+" · "+t[1]]),"Tower"))}
+      ${buF("RFP reference",buT("act.ref",a.id,a.ref,{label:"RFP reference",ph:"For example 4.2.1"}))}
+      ${buF("Layer",buS("act.layer",a.id,a.layer,BU_LAYERS,"Layer"))}
+      ${buF("Driver",buS("act.driver",a.id,a.driver,dOpts,"Driver"),"Sets growth and, if quantity is blank, the quantity")}
+      ${buF("Quantity in Year 1",buN("act.qty",a.id,a.qty,{label:"Quantity",ph:(b.drivers.find(d=>d.id===a.driver)||{}).value!=null&&a.driver?String((b.drivers.find(d=>d.id===a.driver)||{}).value):""}))}
+      ${buF("Times a month",buN("act.freq",a.id,a.freq,{label:"Times a month"}))}
+      ${buF("Hours per unit",buN("act.hpu",a.id,a.hpu,{label:"Hours per unit"}))}
+      ${buF("Maximum lever, %",buN("act.lever",a.id,a.lever,{max:100,label:"Maximum lever"}),"What automation could remove at best")}
+      ${buF("From year",buS("act.from",a.id,a.from,yo,"From year"))}
+      ${buF("To year",buS("act.to",a.id,a.to,yo,"To year"))}
+      ${buF("Scaling",buS("act.scaling",a.id,a.scaling,BU_SCALING,"Scaling"))}
+      ${buF("First role",buT("act.role1",a.id,a.role1,{label:"First role",list:"buRoles",ph:"Choose or type a role"}))}
+      ${buF("Share of first role, %",buN("act.share1",a.id,a.share1,{max:100,label:"Share of first role"}))}
+      ${buF("Second role",buT("act.role2",a.id,a.role2,{label:"Second role",list:"buRoles",ph:"Takes the rest"}))}
+    </div>
+    <div class="buchips"><span class="lbl">Use cases behind the lever</span>${a.ucs.map(c=>`<span class="buchip" title="${esc((CATALOGUE.find(x=>x.cat===c)||{}).n||c)}">${c}<button type="button" data-bucrm="${esc(a.id)}|${c}" aria-label="Remove ${c}">×</button></span>`).join("")}
+      <select data-bu="act.ucadd" data-bid="${esc(a.id)}" aria-label="Add a use case"><option value="">+ Use case</option>${CATALOGUE.filter(c=>!a.ucs.includes(c.cat)).map(c=>`<option value="${c.cat}">${c.cat} · ${esc(c.n)}</option>`).join("")}</select></div>
+    <div class="buchips"><span class="lbl">Skills</span>${a.skills.map(k=>`<span class="buchip">${esc(buSkill(k))}<button type="button" data-buskrm="${esc(a.id)}|${esc(k)}" aria-label="Remove ${esc(buSkill(k))}">×</button></span>`).join("")}
+      <select data-bu="act.skadd" data-bid="${esc(a.id)}" aria-label="Add a skill"><option value="">+ Skill</option>${SKILL_CATALOG.filter(k=>!a.skills.includes(k.id)).map(k=>`<option value="${k.id}">${esc(k.name)}</option>`).join("")}</select></div>
+    ${a.lib?`<div class="hint">Hours, lever, roles and skills come from the starter library entry ${esc(a.lib)}. They are proposed values: edit them for this deal.</div>`:""}
+    ${a.source||a.evidence?`<div class="hint">From the documents${a.source?`: ${esc(a.source)}`:""}${a.evidence?` · <q>${esc(a.evidence)}</q>`:""}</div>`:""}
+    <div class="buout" data-bout="a:${esc(a.id)}"></div></div>`;
+  $("bu21").innerHTML=`<div class="hint" style="margin-bottom:10px">One row per activity in the RFP. Baseline hours a month are quantity × times a month × hours per unit. The starter library proposes hours, levers and roles from invented norms; every value is yours to edit.</div>`
+    +(b.activities.length?b.activities.map(card).join(""):`<div class="panel"><div class="empty">No activities yet. Add the first one.</div></div>`)
+    +`<div class="row" style="margin:6px 0 14px"><button type="button" class="btn primary" data-buadd="act">+ Add an activity</button>${libSel}</div>`;
+}
+function renderBU22(r){
+  const b=S.bu, yo=buYearOpts(r.N), nm=id=>(CATALOGUE.find(c=>c.cat===id)||{}).n||id, rng=(a,z)=>a===z?String(a):`${a}–${z}`;
+  const tow=c=>c.tower?((USECASES.find(u=>u.id===c.tower)||{}).n||""):"";
+  $("bu22").innerHTML=`<div class="panel"><header><h3>Use case catalogue</h3><span class="sub" data-bout="ucsub"></span></header>
+    <div class="hint" style="margin-bottom:8px">Switch on the use cases this deal will build. Each one releases hours from the activities that tick it (step 2), from its start year, and costs its build effort in that year. Effort and duration are from the use case catalogue, not the framework; edit the effort to override it.</div>
+    <div class="loc-table"><table><thead><tr><th>On</th><th>ID</th><th>Use case</th><th>Needs</th><th class="r">Build days (range)</th><th class="r">Build days used</th><th class="r">Starts in</th><th class="r">Activities</th><th class="r">Released, h a month, Year 1</th><th class="r">Released, h a month, Year ${r.N}</th></tr></thead><tbody>${CATALOGUE.map(c=>{const u=r.ucs[c.cat], n=b.activities.filter(a=>a.ucs.includes(c.cat)).length, inOn=c.inside.filter(p=>r.ucs[p].on), so=u.start>r.N?yo.concat([[u.start,`Year ${u.start} (after the term)`]]):yo;
+      return `<tr><td><input type="checkbox" data-bu="uc.on" data-bid="${c.cat}" ${u.on?"checked":""} aria-label="Switch on ${c.cat}"></td><td style="white-space:nowrap">${c.cat}</td><td>${esc(c.n)}${c.tower?`<small style="display:block;color:var(--faint)">Tower method: ${esc(tow(c))}</small>`:""}</td><td>${c.requires.length?esc(c.requires.map(nm).join(", ")):c.inside.length?"Built inside "+c.inside.join(", "):"–"}</td><td class="r">${rng(c.effortMin,c.effortMax)}</td><td class="r">${buN("uc.effort",c.cat,u.custom?u.effort:"",{ph:fmt(u.effort,1),label:"Build days for "+c.cat,cls:"w-s"})}${inOn.length?`<small style="display:block;color:var(--faint)">Built inside ${inOn.join(", ")}: no separate days</small>`:""}</td><td class="r">${buS("uc.start",c.cat,u.start,so,"Start year for "+c.cat)}</td><td class="r">${n}</td><td class="r" data-bout="u1:${c.cat}"></td><td class="r" data-bout="uN:${c.cat}"></td></tr>`}).join("")}</tbody></table></div></div>`;
+}
+function renderBU23(r){
+  const empty=!r.acts.length, yh=r.years.map(y=>`<th class="r">Year ${y.n}</th>`).join("");
+  if(empty){$("bu23").innerHTML=`<div class="panel"><div class="empty">Add activities in step 2 to see the team.</div></div>`;return}
+  const row=(label,f,o)=>`<tr${o&&o.b?' class="tot"':""}><td>${label}</td>${r.years.map(y=>`<td class="r">${f(y)}</td>`).join("")}</tr>`;
+  const layers=Object.keys(BU_LAYER_NAMES).filter(k=>k!=="cont");
+  const skills=[...new Set(r.years.flatMap(y=>Object.keys(y.skills)))];
+  $("bu23").innerHTML=`<div class="panel"><header><h3>FTE by role</h3><span class="sub">Year 1 ${fmt(r.years[0].total,1)} FTE</span></header>
+      <div class="hint" style="margin-bottom:8px">Each cell is the proposed FTE: the larger of the role's floor and the FTE its hours need, rounded up to the step. The grey figure is the FTE the hours need.</div>
+      <div class="loc-table"><table><thead><tr><th>Role</th>${yh}</tr></thead><tbody>
+      ${r.roleList.map(role=>row(esc(role),y=>`<b>${fmt(y.prop[role],2)}</b> <small style="color:var(--faint)">${fmt(y.req[role],2)}</small>`)).join("")}
+      ${row("Run roles",y=>fmt(y.runProp,2))}
+      ${S.bu.aiBuild==="separate"?row("AI build team",y=>fmt(y.sepBuild,2)):""}
+      ${row("<b>Team</b>",y=>`<b>${fmt(y.total,2)}</b>`,{b:1})}
+      </tbody></table></div></div>
+    <div class="panel"><header><h3>What moves the team each year</h3><span class="sub">Change from the year before, in FTE</span></header>
+      ${r.N>1?`<div class="loc-table"><table><thead><tr><th>Reason</th>${r.years.slice(1).map(y=>`<th class="r">Year ${y.n}</th>`).join("")}</tr></thead><tbody>
+      ${row("Year before",y=>y.n===1?"":fmt(r.years[y.n-2].total,2)).replace(/<td class="r"><\/td>/,"")}
+      ${(r.years[1].move||[]).map((m,i)=>`<tr><td>${esc(m[1])}</td>${r.years.slice(1).map(y=>`<td class="r">${buSg(y.move[i][2])}</td>`).join("")}</tr>`).join("")}
+      <tr class="tot"><td><b>Team</b></td>${r.years.slice(1).map(y=>`<td class="r"><b>${fmt(y.total,2)}</b></td>`).join("")}</tr></tbody></table></div>`:`<div class="hint">A one-year term has no year-to-year movement.</div>`}</div>
+    <div class="panel"><header><h3>FTE by layer</h3></header>
+      <div class="loc-table"><table><thead><tr><th>Layer</th>${yh}</tr></thead><tbody>
+      ${layers.map(k=>row(esc(BU_LAYER_NAMES[k]),y=>fmt(y.layerFte[k],2))).join("")}
+      ${row(esc(BU_LAYER_NAMES.cont),y=>fmt(y.cont,2))}
+      ${row("<b>Team</b>",y=>`<b>${fmt(y.total,2)}</b>`,{b:1})}</tbody></table></div></div>
+    <div class="panel"><header><h3>Skills needed</h3><span class="sub">FTE of work by skill, before floors and rounding</span></header>
+      <div class="loc-table"><table><thead><tr><th>Skill</th>${yh}</tr></thead><tbody>
+      ${skills.map(k=>row(esc(buSkill(k)),y=>fmt((y.skills[k]||0)/r.hpf,2))).join("")}</tbody></table></div></div>`;
+}
+function renderBU24(r){
+  const a=r.years, avg=a.reduce((s,y)=>s+y.total,0)/a.length;
+  const fails=r.checks.filter(c=>!c.ok);
+  $("bu24").innerHTML=`<div class="panel"><header><h3>Result</h3><span class="sub">${r.N} ${r.N===1?"year":"years"} · ${S.bu.scenario==="lean"?"Lean":"Base"} scenario</span></header>
+      <div class="bufields" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+        <div class="bukpi"><span>Year 1 team</span><b>${fmt(a[0].total,1)} FTE</b></div>
+        <div class="bukpi"><span>Term average</span><b>${fmt(avg,1)} FTE</b></div>
+        <div class="bukpi"><span>Year ${r.N} team</span><b>${fmt(a[a.length-1].total,1)} FTE</b></div>
+        <div class="bukpi"><span>Net saving, Year ${r.N}</span><b>${fmt(a[a.length-1].netFte,1)} FTE</b></div>
+      </div>
+      <div class="row" style="margin-top:10px"><button type="button" class="btn primary" data-buexport="1">Download bottom-up workbook (CSV)</button></div></div>
+    <div class="panel"><header><h3>Checks</h3><span class="sub">${r.ok?"The totals reconcile":"A total does not reconcile"} · ${fails.length} to look at</span></header>
+      <ul class="buchecks">${r.checks.map(c=>`<li class="${c.ok?"ok":c.lvl}"><span class="ico" aria-hidden="true">${c.ok?"✓":c.lvl==="error"?"✗":c.lvl==="warn"?"!":"i"}</span><span><b>${esc(c.text)}</b>${c.detail&&(!c.ok||c.lvl==="error")?`<small>${esc(c.detail)}</small>`:""}</span></li>`).join("")}</ul></div>
+    <div class="panel"><header><h3>Net saving after the cost of running the AI layer</h3></header>
+      <div class="loc-table"><table><thead><tr><th>FTE</th>${a.map(y=>`<th class="r">Year ${y.n}</th>`).join("")}</tr></thead><tbody>
+      <tr><td>Released by use cases</td>${a.map(y=>`<td class="r">${fmt(y.releasedFte,2)}</td>`).join("")}</tr>
+      <tr><td>AI run effort</td>${a.map(y=>`<td class="r">${fmt(y.aiRunFte,2)}</td>`).join("")}</tr>
+      <tr class="tot"><td><b>Net saving</b></td>${a.map(y=>`<td class="r"><b>${fmt(y.netFte,2)}</b></td>`).join("")}</tr></tbody></table></div></div>
+    <div class="panel"><header><h3>Traceability by RFP reference</h3><span class="sub">Year 1</span></header>
+      ${r.acts.length?`<div class="loc-table"><table><thead><tr><th>RFP ref</th><th>Activity</th><th>Tower</th><th class="r">Baseline, h a month</th><th class="r">After automation, h a month</th><th class="r">FTE</th><th>Roles</th><th>Use cases</th></tr></thead><tbody>${r.acts.map(x=>{const y=a[0].act[x.id];return `<tr><td>${esc(x.ref||"–")}</td><td>${esc(x.name||"(unnamed)")}</td><td>${x.tower}</td><td class="r">${fmt(y.base,1)}</td><td class="r">${fmt(y.hours+y.hyper,1)}</td><td class="r">${fmt((y.hours+y.hyper)/r.hpf,2)}</td><td>${esc([x.role1,x.role2].filter(Boolean).join(", ")||"–")}</td><td>${esc(x.ucs.join(", ")||"–")}</td></tr>`}).join("")}</tbody></table></div>`:`<div class="empty">No activities yet.</div>`}</div>`;
+}
+/* the live figures beside inputs: Year 1 hours for each activity, and hours released by each use case */
+function buOuts(r){
+  const hpf=r.hpf, last=r.years[r.years.length-1];
+  document.querySelectorAll("[data-bout]").forEach(el=>{
+    const [k,id]=el.dataset.bout.split(/:(.*)/s);
+    if(k==="a"){const y=r.years[0].act[id];el.textContent=!y?"":!y.on?"Not active in Year 1.":`Year 1: ${fmt(y.base,1)} h a month before automation, ${fmt(y.hours+y.hyper,1)} h after (${fmt((y.hours+y.hyper)/hpf,2)} FTE), ${fmt(y.released,1)} h released.`}
+    else if(k==="ucsub")el.textContent=`${r.ucOn.length} of ${CATALOGUE.length} switched on · ${fmt(r.years.reduce((s2,y)=>s2+y.buildDays,0),0)} build days`;
+    else if(k==="u1")el.textContent=fmt(r.years[0].ucRel[id]||0,1);
+    else if(k==="uN")el.textContent=fmt(last.ucRel[id]||0,1);
+  });
+}
+function renderBU(){
+  if(!isBU())return;
+  const r=buR();
+  renderBU20(r);renderBU21(r);renderBU22(r);renderBU23(r);renderBU24(r);buOuts(r);
+}
+function updateBU(){
+  if(!isBU())return;
+  const r=buR();renderBU23(r);renderBU24(r);buOuts(r);buAfter();
+}
+function buAfter(){renderNav();updateMeta();save()}
+/* edits: text and numbers update the result without rebuilding the inputs; selects, ticks and list changes rebuild the screens */
+function buSet(t){
+  const f=t.dataset.bu, id=t.dataset.bid, b=S.bu, v=t.value, num=v===""||isNaN(+v)?null:+v, or=(d)=>num==null?d:num;
+  const act=()=>b.activities.find(a=>a.id===id), drv=()=>b.drivers.find(d=>d.id===id), flr=()=>b.floors.find(x=>x.id===id);
+  const ucs=()=>{b.uc[id]=Object.assign({on:false,start:1,effort:null},b.uc[id]||{});return b.uc[id]};
+  if(f==="term.core")b.term.core=num;
+  else if(f==="term.option")b.term.option=or(0);
+  else if(f==="scenario")b.scenario=v==="lean"?"lean":"base";
+  else if(f==="aiBuild")b.aiBuild=v==="inside"?"inside":"separate";
+  else if(["hpf","effPct","hyperPct","footPct","foundDays"].includes(f))b[f]=or(buDefaults()[f]);
+  else if(f==="step")b.step=+v;
+  else if(f==="real"){const i=+t.dataset.bi;if(b.real[id])b.real[id][i]=or(0)}
+  else if(f==="drv.name"){if(drv())drv().name=v}
+  else if(f==="drv.value"){if(drv())drv().value=or(0)}
+  else if(f==="drv.growth"){if(drv())drv().growth=or(0)}
+  else if(f==="floor.role"){if(flr())flr().role=v}
+  else if(f==="floor.fte"){if(flr())flr().fte=or(0)}
+  else if(f==="uc.on")ucs().on=t.checked;
+  else if(f==="uc.start")ucs().start=+v;
+  else if(f==="uc.effort")ucs().effort=num;
+  else if(f==="libadd"){const L=buLib().find(l=>l.id===v);if(L&&b.activities.length<200)b.activities.push(buActivityFromProposal(b,{},L))}
+  else if(f.startsWith("act.")&&act()){
+    const a=act(), k=f.slice(4);
+    if(["name","ref","role1","role2","driver","tower","scaling","layer"].includes(k))a[k]=v;
+    else if(k==="qty")a.qty=num;
+    else if(["freq","hpu","lever"].includes(k))a[k]=or(0);
+    else if(k==="from")a.from=or(1);
+    else if(k==="to")a.to=or(10);
+    else if(k==="share1")a.share1=or(100);
+    else if(k==="ucadd"){if(v&&!a.ucs.includes(v))a.ucs.push(v)}
+    else if(k==="skadd"){if(v&&!a.skills.includes(v)&&a.skills.length<6)a.skills.push(v)}
+  }
+}
+document.addEventListener("input",e=>{
+  const t=e.target;if(!t.dataset||!t.dataset.bu||t.tagName==="SELECT"||t.type==="checkbox")return;
+  buSet(t);updateBU();
+});
+document.addEventListener("change",e=>{
+  const t=e.target;if(!t.dataset||!t.dataset.bu||!(t.tagName==="SELECT"||t.type==="checkbox"))return;
+  buSet(t);buKeepFocus(renderBU);buAfter();
+});
+document.addEventListener("click",e=>{
+  const t=e.target.closest("button");if(!t)return;
+  const d=t.dataset, b=S.bu;
+  if(d.buadd){
+    let id=uid();
+    if(d.buadd==="act")b.activities.push(cleanActivity({id}));
+    else if(d.buadd==="drv")b.drivers.push({id,name:"",value:0,growth:0});
+    else if(d.buadd==="floor")b.floors.push({id,role:"",fte:1});
+    renderBU();buAfter();
+    const el=document.querySelector(`[data-bu="${{act:"act.name",drv:"drv.name",floor:"floor.role"}[d.buadd]}"][data-bid="${id}"]`);if(el)el.focus();
+    return;
+  }
+  if(d.burm){
+    const [k,id]=d.burm.split(/:(.*)/s);
+    if(k==="act")b.activities=b.activities.filter(a=>a.id!==id);
+    else if(k==="drv")b.drivers=b.drivers.filter(x=>x.id!==id);
+    else if(k==="floor")b.floors=b.floors.filter(x=>x.id!==id);
+    renderBU();buAfter();return;
+  }
+  if(d.bucrm||d.buskrm){
+    const [id,v]=(d.bucrm||d.buskrm).split("|"), a=b.activities.find(x=>x.id===id);
+    if(a){if(d.bucrm)a.ucs=a.ucs.filter(x=>x!==v);else a.skills=a.skills.filter(x=>x!==v)}
+    renderBU();buAfter();return;
+  }
+  if(d.buexport)buExport();
+});
+/* a text cell that starts with = + - @ would run as a formula in a spreadsheet, so it gets a leading apostrophe; plain numbers are left alone */
+function buCsvRow(a){return a.map(x=>{let s=String(x==null?"":x);if(/^[=+\-@\t\r]/.test(s)&&!/^-?\d+(\.\d+)?$/.test(s))s="'"+s;return /[",\n\r]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}).join(",")}
+function buExport(){
+  const r=buR(), L=[], P=(...a)=>L.push(buCsvRow(a)), y1=r.years[0];
+  P("DAMO Prism bottom-up estimate");P("Deal",S.deal||"");P("Version",S.meta.version);P("Years modelled",r.N);P("Scenario",S.bu.scenario);P("Productive hours per FTE a month",r.hpf);P("AI build",S.bu.aiBuild==="inside"?"Carried inside the run roles":"Separate build team");P("Totals reconcile",r.ok?"Yes":"No");
+  L.push("");P("Team by role (proposed FTE)",...r.years.map(y=>"Year "+y.n));
+  r.roleList.forEach(x=>P(x,...r.years.map(y=>fmt(y.prop[x],2))));
+  if(S.bu.aiBuild==="separate")P("AI build team",...r.years.map(y=>fmt(y.sepBuild,2)));
+  P("Team",...r.years.map(y=>fmt(y.total,2)));
+  L.push("");P("FTE by layer",...r.years.map(y=>"Year "+y.n));
+  Object.keys(BU_LAYER_NAMES).forEach(k=>P(BU_LAYER_NAMES[k],...r.years.map(y=>fmt(k==="cont"?y.cont:y.layerFte[k],2))));
+  L.push("");P("Net saving (FTE)",...r.years.map(y=>"Year "+y.n));
+  P("Released by use cases",...r.years.map(y=>fmt(y.releasedFte,2)));P("AI run effort",...r.years.map(y=>fmt(y.aiRunFte,2)));P("Net saving",...r.years.map(y=>fmt(y.netFte,2)));
+  L.push("");P("Activities, Year 1","RFP ref","Tower","Layer","Baseline h a month","After automation h a month","FTE","First role","Second role","Use cases");
+  r.acts.forEach(a=>{const y=y1.act[a.id];P(a.name,a.ref,a.tower,a.layer,fmt(y.base,2),fmt(y.hours+y.hyper,2),fmt((y.hours+y.hyper)/r.hpf,3),a.role1,a.role2,a.ucs.join(" "))});
+  L.push("");P("Use cases switched on","Starts in year","Build days");
+  r.ucOn.forEach(c=>P(c.cat+" "+c.n,r.ucs[c.cat].start,fmt(r.ucs[c.cat].effort,1)));
+  L.push("");P("Checks","Result","Detail");
+  r.checks.forEach(c=>P(c.text,c.ok?"Pass":c.lvl==="error"?"Fail":c.lvl==="warn"?"Look at":"Note",c.detail));
+  saveOut(`${slug()}-v${S.meta.version}-bottom-up.csv`,L.join("\r\n"),"text/csv","Bottom-up workbook downloaded");
+}
+function go(n){n=stepFor(n);S.active=n;if(R)renderBar();if(n>=20&&n<=24)renderBU();if(n===2)renderS2();if(n===15){renderClauses();update();}if(n===3){renderS3();update();}if(n===4){renderS4();update();}if(n===5){renderS5();update();}if(n===6){renderS6();update();}if(n===7){renderS7();update();}if(n===8||n===9||n===10){renderS8();update();}if(n===11||n===12){renderS5();update();}if(n===13||n===14){update();}renderRail();save();window.scrollTo({top:0,behavior:"auto"})}
 
 /* ---------- stage 1 static render ---------- */
 /* choosing a region sets the customer location and time zone, offers that region's delivery locations and selects its defaults */
@@ -4324,7 +5016,8 @@ function updateS8(){
 }
 
 function renderBar(){
-  document.body.classList.toggle("on-docs",S.active===0||S.active===15);
+  document.body.classList.toggle("on-docs",S.active===0||S.active===15||isBU());
+  if(isBU())return;   /* the bar shows the tower build-up; the bottom-up result has its own screens */
   const cur=ORDER.includes(S.active)?S.active:1, pos=ORDER.indexOf(cur), reached=id=>ORDER.indexOf(id)<=pos;
   /* Stages 1 and 2 describe the run team (no transformation, no AI engineers); Stage 3 adds the transformation capacity on top */
   const Rr=R.run, P=Rr.p1, B=Rr.bridge, trans=R.total-Rr.total;
@@ -4676,6 +5369,7 @@ const slug=()=>(S.deal||"DAMO").replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"
 /* A short, anonymisable summary of the estimate for the Prism Library: scale, team by role, years, AIOps use cases and assumptions.
    The Library reads this block instead of re-running the engine. It carries no customer name. */
 function libraryBlock(){
+  if(isBU())return null;   /* the Library summary is built from the tower engine */
   try{
     const nm=Object.fromEntries(GROLES.map(r=>[r[0],r[1]])), Y=R.shapeY;
     const team={};Object.entries(Y.years[0].by).forEach(([id,v])=>{if(v>0.005)team[nm[id]||id]=Math.round(v*100)/100});
@@ -4758,6 +5452,7 @@ document.addEventListener("click",e=>{
   const d=t.dataset;
   if(d.addclause){S.clauses=S.clauses||[];if(S.clauses.length<MAX_CLAUSES){const c={id:uid(),ref:"",obligation:"",target:"",source:"",evidence:""};S.clauses.push(c);renderClauses();update();const el=$("cr-"+c.id);if(el)el.focus()}return}
   if(d.rmclause){S.clauses=(S.clauses||[]).filter(c=>c.id!==d.rmclause);S.towers.forEach(x=>{x.clauseIds=(x.clauseIds||[]).filter(i=>i!==d.rmclause)});renderClauses();update();return}
+  if(d.method){setMethod(d.method);return}
   if(d.cpmode){S.adj.mode=d.cpmode;update();return}
   if(d.cmpress){S.cm.pressure=d.cmpress;update();return}
   if(d.adjadd!=null){const inp=$("adjNewMit");if(inp&&inp.value.trim()){S.adj.extra=S.adj.extra||[];S.adj.extra.push({t:inp.value.trim()});update()}return}
@@ -4767,7 +5462,7 @@ document.addEventListener("click",e=>{
   else if(d.dpaste){const ta=$("dp-"+d.dpaste);const v=ta.value.trim();if(v){DOCS.push({id:uid(),type:d.dpaste,name:`Pasted text ${DOCS.filter(x=>x.type===d.dpaste).length+1}`,text:v,meta:`${v.length.toLocaleString()} chars`});ta.value="";renderDocLists();}}
   else if(t.id==="xRun"){runExtraction();}
   else if(t.id==="xStop"){XCTL&&XCTL.abort();}
-  else if(t.id==="xCopy"){const X=window.DamoExtract;if(!X){xStatus("The extraction module didn't load. Open the tool from a web address, not a local file.",true);return}const pr=X.buildExtractionPrompt(okDocs());const box=$("xPromptBox");const fb=()=>{box.hidden=false;box.value=pr;box.focus();box.select();xStatus("Copying was blocked. Select the prompt below and copy it by hand.")};try{navigator.clipboard.writeText(pr).then(()=>xStatus("Prompt copied. Paste it into a Claude chat, then paste the reply below."),fb)}catch(e){fb()}$("xManual").open=true;}
+  else if(t.id==="xCopy"){const X=window.DamoExtract;if(!X){xStatus("The extraction module didn't load. Open the tool from a web address, not a local file.",true);return}const pr=X.buildExtractionPrompt(okDocs(),{activities:isBU()});const box=$("xPromptBox");const fb=()=>{box.hidden=false;box.value=pr;box.focus();box.select();xStatus("Copying was blocked. Select the prompt below and copy it by hand.")};try{navigator.clipboard.writeText(pr).then(()=>xStatus("Prompt copied. Paste it into a Claude chat, then paste the reply below."),fb)}catch(e){fb()}$("xManual").open=true;}
   else if(t.id==="xUsePaste"){const X=window.DamoExtract;if(!X){xStatus("The extraction module didn't load.",true);return}try{showProposals(mergeExtractions(X.sanitizeExtraction(X.parseJsonReply($("xPaste").value)),libraryRefProposals(X,okDocs())));xStatus("Reply read. Review the proposals, then apply.")}catch(e){xStatus("That reply isn't valid JSON. Paste Claude's whole reply.",true)}}
   else if(t.id==="xApply"){applyProposals();}
   else if(t.id==="xAll"||t.id==="xNone"){document.querySelectorAll("[data-xkey]").forEach(c=>c.checked=t.id==="xAll");}
@@ -4818,6 +5513,8 @@ document.addEventListener("click",e=>{
   else if(t.id==="saveBtn"){saveEstimate();}
   else if(t.id==="libBtn"){addToLibrary();}
   else if(t.id==="freshBtn"){toggleFresh();}
+  else if(t.id==="methodBtn"){setMethod(isBU()?"tower":"bottomup");}
+  else if(t.id==="mBuCsv"){buExport();}
   else if(t.id==="custBtn"||t.id==="mCust"){downloadCustomer();}
   else if(t.id==="xlsBtn"||t.id==="mXls"){exportExcel();}
   else if(t.id==="testBtn"){renderTests();}
@@ -5190,7 +5887,8 @@ function mergeExtractions(a,b){
   if(!b)return a;if(!a)return b;
   const o={...a};
   o.docSummary=[a.docSummary,b.docSummary].filter(Boolean).join(" ");
-  o.coverage=a.coverage||b.coverage;o.termYears=a.termYears||b.termYears;
+  o.coverage=a.coverage||b.coverage;o.termYears=a.termYears||b.termYears;o.optionYears=a.optionYears||b.optionYears;
+  {const pk=x=>buKey({ref:x.rfpRef,name:x.name}),seen=new Set((a.activities||[]).map(pk)),ac=[...(a.activities||[]),...(b.activities||[]).filter(x=>{const k=pk(x);if(seen.has(k))return false;seen.add(k);return true})];if(ac.length)o.activities=ac}
   const have=new Set((a.towers||[]).map(t=>t.kind)), tw=[...(a.towers||[]),...(b.towers||[]).filter(t=>!have.has(t.kind))];
   if(tw.length)o.towers=tw;
   const as=[...(a.assumptions||[]),...(b.assumptions||[])];if(as.length)o.assumptions=as;
@@ -5230,14 +5928,14 @@ async function runExtraction(){
   try{
     let json;
     if(XROUTE==="sample"){
-      const prompt=X.buildExtractionPrompt(docs);
+      const prompt=X.buildExtractionPrompt(docs,{activities:isBU()});
       if(new Blob([prompt]).size>MAX_SAMPLE_BYTES)throw {code:"too_long",message:`The documents are too long to send from this page (${chars.toLocaleString()} characters). Remove a document, or paste only the relevant sections.`};
       json=await XSAMPLE.json(prompt,{modelTier:"complex",signal:XCTL.signal});
     }else{
       if(chars>MAX_SERVER_CHARS)throw {code:"too_long",message:`The documents are too long (${chars.toLocaleString()} characters; limit ${MAX_SERVER_CHARS.toLocaleString()}). Remove a document or paste the relevant sections.`};
       const pass=$("xPass").value.trim();try{localStorage.setItem("damo-workflow-pass",pass)}catch(e){}
       const jobId=(crypto.randomUUID&&crypto.randomUUID())||uid()+uid();
-      const r=await fetch("/.netlify/functions/extract-inputs-background",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({jobId,docs,passphrase:pass}),signal:XCTL.signal});
+      const r=await fetch("/.netlify/functions/extract-inputs-background",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({jobId,docs,passphrase:pass,activities:isBU()}),signal:XCTL.signal});
       if(r.status===404)throw {code:"no_server",message:"This site has no extraction service. Use Copy prompt and paste Claude's reply below."};
       if(!r.ok&&r.status!==202)throw {code:"server",message:`The extraction service returned ${r.status}.`};
       for(let i=0;i<180;i++){
@@ -5292,23 +5990,31 @@ function showProposals(j){
   (j.clauses||[]).forEach((c,i)=>add(0,"cl:"+i,"Contract clause",`${c.ref}: ${c.obligation}${c.target?` (target: ${c.target})`:""}`,c));
   if(j.aiAdoption)add(4,"ai","Client AI adoption",j.aiAdoption.value,j.aiAdoption);
   if(j.complexity)add(6,"cplx","Engagement complexity",j.complexity.value,j.complexity);
-  if(j.termYears)add(7,"term","Contract term",`${j.termYears.value} year${j.termYears.value>1?"s":""}`,j.termYears);
+  if(j.termYears)add(isBU()?20:7,"term","Contract term",`${j.termYears.value} year${j.termYears.value>1?"s":""}`,j.termYears);
+  if(isBU()){
+    if(j.optionYears)add(20,"opt","Option years",`${j.optionYears.value} option year${j.optionYears.value===1?"":"s"}`,j.optionYears);
+    (j.activities||[]).forEach((a,i)=>{const L=buLib().find(l=>l.id===a.libraryId);
+      add(21,"act:"+i,"Activity"+(a.rfpRef?" "+a.rfpRef:""),`${a.name}${L?` · starter values from "${L.name}"`:" · no starter match, you enter the hours"}${a.quantity!=null?` · ${a.quantity.toLocaleString()} ${a.driver||"units"}`:""}${a.useCaseIds?` · ${a.useCaseIds.join(", ")}`:""}`,a)});
+  }
   if(j.existingTeam){const e=j.existingTeam;add(8,"ex","Existing team",[["L2","L2"],["L3","L3"],["sreAutomation","SRE/automation"],["managers","managers"],["other","other"]].filter(([k])=>e[k]!=null).map(([k,l])=>`${e[k]} ${l}`).join(", "),e)}
   (j.assumptions||[]).forEach((a,i)=>add(a.stage,"as:"+i,"Assumption",a.text,{source:a.source}));
   (j.risks||[]).forEach((r,i)=>add(r.stage,"rk:"+i,"Risk (switched off, 0%)",`${r.title}${r.note?` — ${r.note}`:""}`,{source:r.source}));
   $("xSummary").innerHTML=j.docSummary?`<div class="summary-box">${esc(j.docSummary)}</div>`:"";
-  const stageName=n=>n===0?"Deal":`Step ${STEPNO[n]||n} · ${(STAGES.find(s=>s.n===n)||{}).t||""}`;
+  const stageName=n=>n===0?"Deal":n>=20?`Bottom-up · Step ${BU_STEPNO[n]} · ${(BU_STAGES.find(s=>s.n===n)||{}).t||""}`:`Step ${STEPNO[n]||n} · ${(STAGES.find(s=>s.n===n)||{}).t||""}`;
+  const rank=n=>n===0?-1:n>=20?100+n:ORDER.indexOf(n);
   let h="";
-  [...new Set(rows.map(r=>r.stage))].sort((a,b)=>(a===0?-1:ORDER.indexOf(a))-(b===0?-1:ORDER.indexOf(b))).forEach(st=>{
+  [...new Set(rows.map(r=>r.stage))].sort((a,b)=>rank(a)-rank(b)).forEach(st=>{
     h+=`<h4>${esc(stageName(st))}</h4>`;
     rows.filter(r=>r.stage===st).forEach(r=>{h+=`<label class="prow" for="xp-${r.key}"><input type="checkbox" id="xp-${r.key}" data-xkey="${r.key}" checked><div><div class="pv"><b>${esc(r.label)}:</b> ${esc(String(r.value))}</div>${evHtml(r.o)}</div></label>`;
       const m=/^tower:(\d+)$/.exec(r.key), kind=m&&r.o&&r.o.kind, have=kind?S.towers.filter(x=>x.kind===kind):[];
       if(have.length)h+=`<div class="hint" style="margin:-4px 0 10px 28px"><label for="xm-${r.key}">You already have ${have.length} ${esc(KIND_NAME[kind])} tower${have.length>1?"s":""}. </label><select id="xm-${r.key}" data-xmerge="${r.key}" aria-label="What to do with this ${esc(KIND_NAME[kind])} tower">${have.map((x,n)=>`<option value="${x.id}">Update ${esc(x.name||KIND_NAME[kind]+" tower "+(n+1))}: change only the fields listed above</option>`).join("")}<option value="new">Add as a new tower</option></select></div>`});
   });
+  if(!isBU()&&j.activities&&j.activities.length)h+=`<div class="hint" style="margin:10px 0">The documents list ${j.activities.length} ${j.activities.length===1?"activity":"activities"}. They are used by the bottom-up method: switch to it from File, Sizing method, and they will be offered for review.</div>`;
   if(j.openQuestions&&j.openQuestions.length)h+=`<h4>Open questions for the client</h4><ul style="margin:0;padding-left:18px;font-size:14px">${j.openQuestions.map(q=>`<li>${esc(q)}</li>`).join("")}</ul><div class="hint">Open questions are added to the Step 1 assumptions as items to confirm when you apply.</div>`;
   $("xProps").innerHTML=h||`<div class="empty">Claude found nothing it could support from these documents.</div>`;
   $("xResSub").textContent=`${rows.length} proposal${rows.length===1?"":"s"}`;
   $("xApplyRow").hidden=!rows.length;
+  renderMethod();
 }
 /* Builds the tower a proposal describes. With a target, the proposal updates that existing tower and changes only the fields it provides;
    without one it makes a new tower, exactly as before. The caller adds a new tower to the estimate. */
@@ -5371,17 +6077,30 @@ function applyProposals(){
   });
   if(j.aiAdoption&&on("ai")){S.aiMaturity=j.aiAdoption.value;mark("ai","Client AI adoption",j.aiAdoption);n++}
   if(j.complexity&&on("cplx")){S.cplx=j.complexity.value;mark("cplx","Engagement complexity",j.complexity);n++}
-  if(j.termYears&&on("term")){S.term=j.termYears.value;mark("term","Contract term",j.termYears);n++}
+  if(j.termYears&&on("term")){S.term=j.termYears.value;S.bu.term.core=j.termYears.value;mark("term","Contract term",j.termYears);n++}
+  /* bottom-up: option years and activities are applied only when the bottom-up method is on, and an activity already listed is filled in, not repeated */
+  let nAct=0;
+  if(isBU()){
+    if(j.optionYears&&on("opt")){S.bu.term.option=j.optionYears.value;n++}
+    (j.activities||[]).forEach((x,i)=>{
+      if(!on("act:"+i))return;
+      const a=buActivityFromProposal(S.bu,x,buLib().find(l=>l.id===x.libraryId)), ex=S.bu.activities.find(e=>buKey(e)===buKey(a));
+      if(ex){if(!ex.evidence)ex.evidence=a.evidence;if(!ex.source)ex.source=a.source;if(!ex.ucs.length)ex.ucs=a.ucs}
+      else if(S.bu.activities.length<200)S.bu.activities.push(a);
+      else return;
+      nAct++;n++;
+    });
+  }
   if(j.existingTeam&&on("ex")){const e=j.existingTeam;S.ex={L2:e.L2??null,L3:e.L3??null,trans:e.sreAutomation??null,gov:e.managers??null,other:e.other??null};const s0=(e.source||"").toLowerCase();S.exSource=/rfp|handover/.test(s0)?"rfp":/note|call|meeting/.test(s0)?"verbal":S.exSource;mark("ex","Existing team",e);n++}
   S.prov=S.prov||{};P.forEach(([k,label,o])=>{S.prov[k]={label,source:o.source||"documents",evidence:o.evidence||"",snap:provVal(k),at:new Date().toISOString().slice(0,10)}});
   (j.assumptions||[]).forEach((a,i)=>{if(on("as:"+i)){S.assumptions["s"+a.stage].push({t:`${a.text} (from ${src(a)})`,c:ACAT_DEFAULT["s"+a.stage]||"Other"});n++}});
   (j.risks||[]).forEach((r,i)=>{if(on("rk:"+i)){S.risks["s"+r.stage].push({id:uid(),on:false,pct:0,title:r.title,note:`${r.note||""} (from ${src(r)})`.trim()});n++}});
   (j.openQuestions||[]).forEach(q=>S.assumptions.s1.push({t:`To confirm with the client: ${q}`,c:"Client responsibilities"}));
-  renderAll();go(nClauses?15:1);toast(`${n} input${n===1?"":"s"} applied from the documents`+(nClauses?`, including ${nClauses} contract clause${nClauses===1?"":"s"}. Check the links to towers, then continue.`:""));
+  renderAll();go(nClauses?15:nAct?21:1);toast(`${n} input${n===1?"":"s"} applied from the documents`+(nClauses?`, including ${nClauses} contract clause${nClauses===1?"":"s"}. Check the links to towers, then continue.`:nAct?`, including ${nAct} ${nAct===1?"activity":"activities"}. Check the hours, then continue.`:""));
 }
 
 /* ---------- boot ---------- */
-function renderAll(){renderMeta();renderRail();renderS0();renderClauses();renderS1();renderS2();renderS3();renderS4();renderS5();renderS6();renderS7();renderS8();["s1","s2","s3","s4","s5","s6","s7","s8","s9"].forEach(k=>{renderAssume(k);if(S.risks[k])renderRisks(k)});update();}
+function renderAll(){renderMeta();renderRail();renderS0();renderMethod();renderBU();renderClauses();renderS1();renderS2();renderS3();renderS4();renderS5();renderS6();renderS7();renderS8();["s1","s2","s3","s4","s5","s6","s7","s8","s9"].forEach(k=>{renderAssume(k);if(S.risks[k])renderRisks(k)});update();}
 /* deep link from the user guide: index.html#stage=3 opens that stage */
 {const m=/stage=(\d+)/.exec(location.hash);if(m&&+m[1]>=0&&+m[1]<=15)S.active=+m[1];}
 renderAll();

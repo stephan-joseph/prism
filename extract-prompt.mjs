@@ -23,6 +23,51 @@ export const SKILL_IDS = {
 
 /* the most clauses one extraction may return; keeps the reply short on a gateway model */
 export const MAX_CLAUSES = 25;
+/* the most activities one extraction may return */
+export const MAX_ACTIVITIES = 60;
+
+/* The use case catalogue ids Claude may name. Keep ids and names in step with CATALOGUE in index.html (scripts/test-extract.mjs checks this). */
+export const UC_CATALOGUE = {
+  "UC-01": "Incident triage from observability data", "UC-02": "Incident summarisation", "UC-03": "Similar incident search",
+  "UC-04": "Runbook lookup", "UC-05": "Post-incident review generation", "UC-06": "Incident executive summary",
+  "UC-07": "Daily incident report", "UC-08": "Call notes analysis", "UC-09": "Free-form operations chat",
+  "UC-10": "Incident analytics dashboard", "UC-11": "Monthly report slide generation", "UC-12": "Periodic PDF report export",
+  "UC-13": "Ticket form AI assistant", "UC-14": "New incident notifications", "UC-15": "Knowledge base chat",
+  "UC-16": "Incident investigation agent", "UC-17": "Critical alert auto-triage", "UC-18": "Alert optimisation",
+  "UC-19": "Production error diagnosis", "UC-20": "Incident context extraction", "UC-21": "Diagnosis report generation",
+  "UC-22": "Support evidence packet preparation", "UC-23": "Operational knowledge query", "UC-24": "Support knowledge ingestion",
+  "UC-25": "Service risk scoping", "UC-26": "Focused observability gap review", "UC-27": "Observability implementation planning",
+  "UC-28": "Service telemetry implementation", "UC-29": "Monitoring-as-code implementation",
+};
+
+/* Starter activity library for the bottom-up method. Every value is invented and proposed, not from the framework or any client: the architect edits them for the deal. A lever is only set where a use case sits behind it.
+   Hours a month = quantity x hpu (hours per unit a month). driver names what the quantity is; a fixed activity has qty 1 and no driver. */
+const A = (id, kind, name, layer, driver, hpu, lever, role1, share1, role2, ucs, skills, scaling, qty) =>
+  ({ id, kind, name, layer, driver, hpu, lever, role1, share1, role2, ucs, skills, scaling: scaling || (driver ? "volume" : "fixed"), qty: driver ? null : (qty == null ? 1 : qty) });
+export const ACTIVITY_LIBRARY = [
+  A("AMS-01", "AMS", "Monitor and triage application alerts", "run", "Alerts a month", 0.25, 40, "L2 engineer", 70, "L3 engineer", ["UC-01"], ["sse"]),
+  A("AMS-02", "AMS", "Resolve application incidents", "run", "Incidents a month", 1.5, 25, "L2 engineer", 60, "L3 engineer", ["UC-02", "UC-03", "UC-04"], ["sse"]),
+  A("AMS-03", "AMS", "Fulfil application service requests", "run", "Service requests a month", 0.75, 30, "L2 engineer", 100, "", ["UC-04"], ["sse"]),
+  A("AMS-04", "AMS", "Problem and change management for applications", "run", "Changes a month", 2, 15, "Technical lead", 50, "L3 engineer", ["UC-05"], ["sse"]),
+  A("AMS-05", "AMS", "Releases and deployments", "run", "Releases a month", 6, 0, "Release engineer", 100, "", [], ["sse"]),
+  A("IMS-01", "IMS", "Monitor infrastructure and cloud alerts", "run", "Alerts a month", 0.2, 45, "L1.5 engineer", 60, "SRE", ["UC-01", "UC-18"], ["infra"]),
+  A("IMS-02", "IMS", "Resolve infrastructure incidents", "run", "Incidents a month", 1.25, 25, "L2 engineer", 60, "L3 engineer", ["UC-02", "UC-03", "UC-04"], ["infra"]),
+  A("IMS-03", "IMS", "Platform administration and patching", "run", "Hosts", 0.5, 0, "Platform administrator", 100, "", [], ["infra"]),
+  A("IMS-04", "IMS", "Backup and disaster recovery checks", "run", "Protected systems", 1, 0, "Platform administrator", 100, "", [], ["infra"]),
+  A("IMS-05", "IMS", "Security and compliance operations", "run", "Findings a month", 1, 0, "Security analyst", 100, "", [], ["sre"]),
+  A("DMS-01", "DMS", "Monitor data pipelines", "run", "Pipelines", 0.5, 40, "Data engineer", 100, "", ["UC-01"], ["data"]),
+  A("DMS-02", "DMS", "Resolve data incidents and reruns", "run", "Incidents a month", 1.5, 20, "Data engineer", 70, "L3 engineer", ["UC-02"], ["dse"]),
+  A("DMS-03", "DMS", "Data quality checks", "run", "Data products", 2, 0, "Data engineer", 100, "", [], ["data"]),
+  A("DMS-04", "DMS", "Database administration", "run", "Databases", 4, 0, "Database administrator", 100, "", [], ["dba"]),
+  A("AI-01", "AI", "Operate and monitor agents", "run", "Agents", 8, 20, "AI engineer", 100, "", ["UC-16"], ["llmops"]),
+  A("AI-02", "AI", "Evaluate and tune prompts and guardrails", "aiRun", "Agents", 6, 0, "AI engineer", 100, "", [], ["aieval"]),
+  A("AI-03", "AI", "Review the human approval queue", "aiRun", "Approvals a month", 0.2, 0, "L2 engineer", 100, "", [], ["llmops"]),
+  A("GOV-01", "GOV", "Service delivery management", "gov", null, 140, 0, "Service delivery lead", 100, "", [], []),
+  A("GOV-02", "GOV", "SLA and KPI reporting", "gov", null, 24, 30, "Service delivery lead", 100, "", ["UC-07", "UC-11"], []),
+  A("GOV-03", "GOV", "Service reviews and governance meetings", "gov", null, 16, 0, "Service delivery lead", 100, "", [], []),
+  A("GOV-04", "GOV", "Runbook and knowledge upkeep", "ci", null, 40, 30, "Knowledge analyst", 100, "", ["UC-24"], []),
+  A("GOV-05", "GOV", "Minor enhancements within scope", "ci", null, 60, 0, "L3 engineer", 100, "", [], []),
+];
 
 const SCHEMA_EXAMPLE = {
   docSummary: "3-5 sentences in your own words: client, scope, service window, what is being asked for.",
@@ -47,6 +92,12 @@ const SCHEMA_EXAMPLE = {
   assumptions: [{ stage: 2, text: "Client keeps the L1 service desk.", source: "RFP" }],
   risks: [{ stage: 2, title: "Undocumented integrations", note: "Why it matters, one sentence.", source: "Meeting notes" }],
   openQuestions: ["What is the P1 restoration target outside business hours?"],
+};
+
+/* Only asked for when the page says the bottom-up method is on, so a tower extraction keeps the shorter prompt and reply. */
+const BU_SCHEMA = {
+  optionYears: { value: 2, evidence: "short quote", source: "RFP" },
+  activities: [{ rfpRef: "4.2.1", name: "Monitor production alerts", towerKind: "AMS", libraryId: "AMS-01", driver: "Alerts a month", quantity: 1200, useCaseIds: ["UC-01"], evidence: "short quote", source: "RFP" }],
 };
 
 const RULES = `Rules:
@@ -87,15 +138,24 @@ const RULES = `Rules:
     1 base team/coverage, 2 towers/demand, 3 skill coverage by shift, 4 transformation/AI, 5 governance, 6 seniority/contingency, 7 term/savings, 8 existing team.
 - openQuestions: the most important gaps the deal team should close with the client (max 8).`;
 
+const RULES_BU = `Rules for the bottom-up fields (optionYears and activities):
+- optionYears.value: 0-5, the extension years after the core term, only if the documents state them.
+- activities: the distinct operational activities the RFP asks the supplier to perform: monitoring, incident handling, service requests, problem and change, releases, platform administration, backup and recovery, security, reporting, governance, knowledge upkeep. At most ${MAX_ACTIVITIES}. One entry per activity. Keep "rfpRef" exactly as written in the document (the clause or section number). Omit the list if the documents do not describe activities.
+- activities[].towerKind: "AMS", "IMS", "DMS", "AI", or "GOV" for service management and governance.
+- activities[].libraryId: the id of the starter library entry that describes the same work, from this list only: ${ACTIVITY_LIBRARY.map((l) => `${l.id} = ${l.name}`).join("; ")}. Omit it unless the entry fits closely.
+- activities[].driver: what the activity scales with, in a few words (for example "Alerts a month"). activities[].quantity: the Year 1 amount of that driver. Include both only when the documents state them. Never estimate hours.
+- activities[].useCaseIds: only when the documents ask for an AI or automation capability for that activity. Ids from this list only: ${Object.entries(UC_CATALOGUE).map(([k, v]) => `${k} = ${v}`).join("; ")}. Omit if you are not sure.`;
+
 /* docs: [{type: "rfp"|"incidents"|"notes"|"other", name, text}] */
-export function buildExtractionPrompt(docs) {
+export function buildExtractionPrompt(docs, opts = {}) {
+  const bu = !!(opts && opts.activities);
   const body = docs.map((d, i) =>
     `<document index="${i + 1}" type="${DOC_TYPES[d.type] || "Other"}" name="${String(d.name || "").replace(/"/g, "'")}">\n${d.text}\n</document>`
   ).join("\n\n");
   return "You are helping a deal team size a DAMO managed-services engagement. Read the documents below and extract the inputs " +
     "for the estimation workflow as a JSON object in the shape shown.\n\n" +
-    "Target shape (example values, not the answer):\n" + JSON.stringify(SCHEMA_EXAMPLE, null, 2) + "\n\n" +
-    RULES + "\n\n" + body;
+    "Target shape (example values, not the answer):\n" + JSON.stringify(bu ? { ...SCHEMA_EXAMPLE, ...BU_SCHEMA } : SCHEMA_EXAMPLE, null, 2) + "\n\n" +
+    RULES + (bu ? "\n" + RULES_BU : "") + "\n\n" + body;
 }
 
 /* ---- cleaning: drop anything outside the allowed sets, clamp numbers ---- */
@@ -176,6 +236,29 @@ export function sanitizeExtraction(raw) {
       });
     }).filter(Boolean);
     if (!out.towers.length) delete out.towers;
+  }
+  if (Array.isArray(r.activities)) {
+    const acts = [], seen = new Set();
+    for (const a of r.activities) {
+      if (acts.length >= MAX_ACTIVITIES) break;
+      const name = a && str(a.name, 120);
+      if (!name) continue;
+      const ref = str(a.rfpRef, 40), key = clauseKey((ref || "") + "|" + name);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const lib = ACTIVITY_LIBRARY.find((l) => l.id === a.libraryId);
+      const ids = Array.isArray(a.useCaseIds) ? [...new Set(a.useCaseIds.filter((x) => typeof x === "string" && Object.hasOwn(UC_CATALOGUE, x)))] : [];
+      acts.push(prune({
+        rfpRef: ref, name, towerKind: oneOf(a.towerKind, ["AMS", "IMS", "DMS", "AI", "GOV"]) || (lib && lib.kind),
+        libraryId: lib ? lib.id : undefined, driver: str(a.driver, 60), quantity: num(a.quantity, 0, 1e9),
+        useCaseIds: ids.length ? ids : undefined, ...ev(a),
+      }));
+    }
+    if (acts.length) out.activities = acts;
+  }
+  if (r.optionYears && typeof r.optionYears === "object") {
+    const y = num(r.optionYears.value, 0, 5);
+    if (y !== undefined) out.optionYears = prune({ value: Math.round(y), ...ev(r.optionYears) });
   }
   const pick = (o, set) => (o && typeof o === "object" ? prune({ value: oneOf(o.value, set), ...ev(o) }) : undefined);
   out.aiAdoption = pick(r.aiAdoption, ["low", "moderate"]);
