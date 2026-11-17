@@ -73,6 +73,7 @@ const SCHEMA_EXAMPLE = {
   docSummary: "3-5 sentences in your own words: client, scope, service window, what is being asked for.",
   clientName: "Acme Bank",
   coverage: { daysPerWeek: 5, hoursPerDay: 24, outOfHours: "oncall", weekends: "none", p1PerMonth: 6,
+    regions: [{ region: "eu", startLocal: 9, hoursPerDay: 8 }, { region: "apac", startLocal: 9, hoursPerDay: 8 }],
     evidence: "short quote", source: "RFP" },
   towers: [{
     kind: "AMS", name: "Retail banking apps",
@@ -106,6 +107,7 @@ const RULES = `Rules:
 - "evidence" is a short quote (under 25 words) from the document; "source" is the document type it came from.
 - coverage.daysPerWeek: 5, 6 or 7. coverage.hoursPerDay: 1-24 (business hours only = 8 or 9, "16x5" = 16, "24x7" = 24).
 - coverage.outOfHours: "active" if people must be working outside business hours, "oncall" if only reachable for P1/critical incidents. Omit if coverage is business hours only.
+- coverage.regions: only when the documents ask for support to different customer geographies, each with its own local hours (for example Europe, APAC and North America at 09:00 to 17:00 local). One entry per geography: region is "eu", "apac", "na" or "ime" (India and Middle East), startLocal is the local start hour (0 to 23.5, 9 = 09:00), hoursPerDay is the hours a day in that geography's local time. Give at most 4. Omit when there is a single geography or the hours are not stated per geography. Do not work out a combined window; the tool does that.
 - coverage.weekends: "active", "oncall" or "none".
 - coverage.p1PerMonth: P1 / critical incidents a month across all hours. Use the incident dump summary's priority counts divided by its months. Omit if unknown.
 - towers[].serviceLevels: "L1+L2+L3", "L2+L3", "L2" or "L3": the support levels the client wants us to provide for that estate. Omit if not stated.
@@ -172,6 +174,21 @@ const prune = (o) => {
 };
 const ev = (o) => ({ evidence: str(o && o.evidence, 300), source: str(o && o.source, 60) });
 
+const GEO_REGIONS = ["eu", "apac", "na", "ime"];
+function cleanRegions(a) {
+  if (!Array.isArray(a)) return undefined;
+  const seen = new Set(), out = [];
+  for (const e of a) {
+    if (out.length >= 4) break;
+    const region = e && oneOf(e.region, GEO_REGIONS), h = e && num(e.hoursPerDay, 1, 24);
+    if (!region || h === undefined || seen.has(region)) continue;
+    seen.add(region);
+    const st = num(e.startLocal, 0, 23.5);
+    out.push({ region, startLocal: st === undefined ? 9 : Math.round(st * 2) / 2, hoursPerDay: Math.round(h) });
+  }
+  return out.length ? out : undefined;
+}
+
 export function sanitizeExtraction(raw) {
   const r = raw && typeof raw === "object" ? raw : {};
   const out = { docSummary: str(r.docSummary, 2000), clientName: str(r.clientName, 120) };
@@ -183,6 +200,7 @@ export function sanitizeExtraction(raw) {
       outOfHours: oneOf(c.outOfHours, ["active", "oncall"]),
       weekends: oneOf(c.weekends, ["active", "oncall", "none"]),
       p1PerMonth: num(c.p1PerMonth, 0, 100000),
+      regions: cleanRegions(c.regions),
       ...ev(c),
     });
   }

@@ -138,4 +138,17 @@ check("the starter library is consistent and uses only known ids", () => {
   assert.ok(skills.size > 10);
 });
 
+check("coverage regions are cleaned: known regions, no repeats, at most 4, hours required", () => {
+  const r = sanitizeExtraction({ coverage: { hoursPerDay: 8, regions: [
+    { region: "eu", startLocal: 9.3, hoursPerDay: 8 }, { region: "EU", hoursPerDay: 8 }, { region: "eu", hoursPerDay: 6 },
+    { region: "apac", hoursPerDay: 8.4 }, { region: "mars", hoursPerDay: 8 }, { region: "na", startLocal: 99, hoursPerDay: 8 },
+    { region: "ime" }, { region: "na", hoursPerDay: 0 }, "junk", null ] } });
+  const g = r.coverage.regions;
+  assert.deepEqual(g.map((x) => x.region), ["eu", "apac", "na"]);
+  assert.deepEqual(g.map((x) => x.startLocal), [9.5, 9, 9]);
+  assert.deepEqual(g.map((x) => x.hoursPerDay), [8, 8, 8]);
+  assert.equal(sanitizeExtraction({ coverage: { hoursPerDay: 8, regions: "x" } }).coverage.regions, undefined);
+  assert.equal(sanitizeExtraction({ coverage: { hoursPerDay: 8, regions: [{ region: "eu", hoursPerDay: 8 },{ region: "apac", hoursPerDay: 8 },{ region: "na", hoursPerDay: 8 },{ region: "ime", hoursPerDay: 8 }] } }).coverage.regions.length, 4);
+});
+
 console.log(`${n} checks passed`);

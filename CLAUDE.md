@@ -33,7 +33,7 @@ Open `index.html` in a browser for the calculators. Extraction needs it served o
 python3 -m http.server 8000
 ```
 
-Self-tests (the engine's checks against the framework's worked examples, plus invariants and feature tests). Expect every test to pass; the count was 188 after the bottom-up method, its qualifiers and their review fixes.
+Self-tests (the engine's checks against the framework's worked examples, plus invariants and feature tests). Expect every test to pass; the count is 223 (188 after the bottom-up method, plus 35 for several customer locations, shift limits, the gap finder and the outputs).
 
 ```bash
 python3 scripts/run-selftests.py
@@ -41,7 +41,7 @@ python3 scripts/run-selftests.py
 
 The same tests run in the app from the "Run checks" button in the final review step. Add a test whenever you change the engine.
 
-The extraction cleaning in `extract-prompt.mjs` (clauses, activities, option years), the starter activity library and the use case list have their own Node checks (17): `node scripts/test-extract.mjs`. That script also reads `index.html` to confirm the prompt's use case list and the library match `CATALOGUE` and `SKILL_CATALOG`.
+The extraction cleaning in `extract-prompt.mjs` (clauses, activities, option years), the starter activity library and the use case list have their own Node checks (18): `node scripts/test-extract.mjs`. That script also reads `index.html` to confirm the prompt's use case list and the library match `CATALOGUE` and `SKILL_CATALOG`.
 
 ## Deploy
 
@@ -64,6 +64,7 @@ The Library address is the constant `LIBRARY_URL` in `index.html`. Change it to 
 
 Key areas in `index.html`:
 - **Coverage:** `autoLayout`, `bestFitLayout`, `coverageOf`. The "Support asked for" choice (`S.support`: active or passive) lays out windows. Passive puts hours outside 07:00 to 20:00 local on call for P1.
+- **Several customer locations, shift limits, gap finder:** `S.custExtra` holds other customer locations (`{id,region,loc,utc,s,h}`); the primary stays `S.region/custLoc/tz/start/hours`. `reqMaskOf` merges all windows onto the `S.tz` clock (48 half-hour buckets); `reqHoursOf` is its length; `compute()`, `baseTeamOf` and `covLabel` use it. `S.shiftLimits={on,from,to}` (off by default) feeds `bestFitMask`, `inLimits` and `limitWarnings`. `dlocOptions` gives the delivery chips. `suggestLocations` is a pure greedy cover over `LOC_CATALOG`; `addDeliveryLocation` is the Add button. `changeDelivery` adds or removes a delivery location: it lays out every window again unless the windows were edited by hand (`S.meta.winManual`, set by window edits and cleared by `autoLayout` or `bestFitLayout`), in which case only the changed location is touched (`gapWindowsFor`). Outputs: `custList/custText/limitsText`, `coverageSheetRows` (Excel Coverage sheet). Approximations: one daily pattern, one `days`, no DST. Extraction returns `coverage.regions` (region, `startLocal`, `hoursPerDay`; cleaned by `cleanRegions` in `extract-prompt.mjs`); `applyProposals` writes the primary and `custExtra` when one or more are given (it replaces the earlier extras), otherwise the top-level coverage fields apply as before.
 - **Towers:** `mkTower`, the demand cascade in `compute()`. A tower with no demand adds 0 FTE; Step 2 warns about it (`emptyWarn`, `notes2`).
 - **Team shape:** `shapeOf`, `shapeYears`, `GROLES`, `DEFAULT_ROLE`, special roles.
 - **Savings and term:** `USECASES` (20: 14 assistive, 6 agentic with autonomy levels), `pfOf`, `pfYears`, and the **productivity commitment** `S.prod` (default 12% a year from Year 2, never below the floor). The year-by-year team follows the committed path; `years[n].mBase` is the modelled path and `years[n].gap` is the unsupported part.

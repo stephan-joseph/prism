@@ -370,6 +370,9 @@ quiz:[
 <p class="lead">How many people it takes to keep someone on duty in every hour of the support window, whatever the ticket volume, given when each delivery location actually works.</p>
 <ol class="steps">
 <li><div>Say <b>where the opportunity is from</b>: the region (Europe, APAC, North America, India and Middle East), the customer location and its <b>time zone</b> as a UTC offset. The time zone fills in from the location and can be edited.</div></li>
+<li><div>Need more than one geography? Select several regions. Each gets its own location, time zone, <b>local start</b> and hours a day. The tool merges them into one <b>combined window</b> on the first region's clock. Hours where two geographies are open count once, and the people on duty are one shared pool.</div></li>
+<li><div>Turn on <b>Shift limits</b> if delivery locations must not work early or late (for example no earlier than 06:30 and no later than 21:00 local). Best fit then keeps every shift inside them.</div></li>
+<li><div>Read <b>Gaps and how to close them</b>. It lists hours nobody covers and the delivery locations that would close them. Press <span class="ui">Add</span> to add one.</div></li>
 <li><div>Pick the <b>support window</b> (<span class="ui">24x5</span>, <span class="ui">16x7</span> …) and the time it <b>starts</b>. The window is on the customer's clock.</div></li>
 <li><div>Set <b>people on duty</b> (L2 and L3). The framework minimum is one each.</div></li>
 <li><div>Tick the <b>delivery locations</b> offered for the region: Europe offers EU (onshore), Romania (nearshore) and India (offshore); APAC offers Singapore, Australia, China and India (offshore); North America offers LATAM, Ecuador, Brazil (nearshore) and India (offshore); IME offers India only. Leave and public holidays are editable per location.</div></li>
@@ -691,6 +694,7 @@ const EXAMPLE=[
 ];
 
 const FAQ=[
+ ["Can one estimate cover APAC, North America and Europe?","Yes. Select all three regions in Step 1. Each keeps its own local hours, and the tool shows the combined window. The week is one daily pattern repeated on the days a week, with no daylight saving, so day edges are approximate."],
  ["Why did my bottom-up team get bigger when I turned on the coverage floor?","The support window needs a minimum number of people on duty in every hour, whatever the activity hours say. If the L2 and L3 roles from your activities come to less, the gap is added so the team can staff the window. Automation cannot take the team below it."],
  ["I changed the support window in bottom-up and my tower estimate moved. Why?","The support window, locations, complexity, contingency, manager ratio and existing team are shared by both methods. Enter them once; a change in either method changes both."],
  ["Is the service delivery lead counted twice?","It can be: if an activity already gives a delivery lead and managers are sized from a ratio, both count. Step 5 lets you size managers from the activities only, and a check warns when both are on."],
@@ -717,6 +721,9 @@ const FAQ=[
 ];
 
 const GLOSS=[
+ ["Combined window","The hours at least one customer geography is open, shown on one clock. Overlaps count once."],
+ ["Shift limits","The earliest start and latest end, in local time, that a delivery location may work. Off by default."],
+ ["Gap finder","Lists the support hours nobody covers and the delivery locations that would close them."],
  ["Coverage floor","In bottom-up, the smallest team that can staff the support window (the tower method's base team). The activities' L2 and L3 roles are topped up to it, and it holds when automation cuts hours."],
  ["Role tier","Whether a bottom-up role is L2, L3 or other. L2 and L3 roles staff the shifts, count toward the coverage floor and are backfilled for leave."],
  ["Grade mix","The delivery team, contingency and manager split into Lead, Senior and Consultant with the complexity's pyramid. A view only."],
