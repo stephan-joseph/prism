@@ -726,13 +726,21 @@ tr.sel td{background:var(--accent-soft)}
         <div class="stickhost"><div class="tlmini" id="tlMini" aria-live="polite"></div><div class="fgrid">
 
         <div class="field">
-          <div class="lbl">Where is the opportunity from? <span class="tag">customer location</span></div>
-          <div class="seg" id="regionSeg" role="group" aria-label="Customer region"></div>
+          <div class="lbl">Customer location <span class="tag">sets the clock</span></div>
           <div class="row">
-            <label class="inline" for="custLoc">Customer location <select id="custLoc"></select></label>
-            <label class="inline" for="custTz">Customer time zone, UTC offset <input id="custTz" type="number" min="-12" max="14" step="0.5" style="width:84px"></label>
+            <label class="inline" for="custRegion">Region <select id="custRegion"></select></label>
+            <label class="inline" for="custLoc">Location <select id="custLoc"></select></label>
+            <label class="inline" for="custTz">Time zone, UTC offset <input id="custTz" type="number" min="-12" max="14" step="0.5" style="width:84px"></label>
           </div>
           <div class="hint" id="regionHint"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field">
+          <div class="lbl">Geographies to cover <span class="tag">each with its own local hours</span></div>
+          <div class="seg" id="regionSeg" role="group" aria-label="Geographies to cover"></div>
+          <div class="hint" id="geoHint" style="margin-top:4px"></div>
           <div id="custExtra"></div>
         </div>
 
@@ -751,10 +759,8 @@ tr.sel td{background:var(--accent-soft)}
           <div id="provCov"></div>
           <div class="row">
             <label class="inline" for="days">Days a week <select id="days"><option>5</option><option>6</option><option>7</option></select></label>
-            <label class="inline" for="hours">Hours a day <input id="hours" type="number" min="1" max="24" step="1"></label>
-            <label class="inline" for="winStart">Starts at <input id="winStart" type="time" step="900"></label>
           </div>
-          <div class="hint">The window is on the customer's clock. Each delivery location below works its own hours, in its own time zone, and the timeline shows how they line up. A live strip pinned above these inputs redraws as you change them; the full timeline is below.</div>
+          <div class="hint">Each geography above asks for its own local hours. Each delivery location below works its own hours, in its own time zone, and the timeline shows how they line up. A live strip pinned above these inputs redraws as you change them; the full timeline is below.</div>
         </div>
 
         <div class="divider"></div>
@@ -785,7 +791,7 @@ tr.sel td{background:var(--accent-soft)}
           <div class="hint" id="dlocHint"></div>
           <div class="loc-table">
             <table>
-              <thead><tr><th>Location</th><th class="r">UTC offset</th><th class="r">Leave days</th><th class="r">Public holidays</th><th class="r">Available</th><th></th></tr></thead>
+              <thead><tr><th>Location</th><th class="r" title="UTC offset">UTC</th><th class="r" title="Leave days a year">Leave</th><th class="r" title="Public holidays a year">Holidays</th><th class="r">Avail.</th><th></th></tr></thead>
               <tbody id="locBody"></tbody>
             </table>
           </div>
@@ -837,7 +843,6 @@ tr.sel td{background:var(--accent-soft)}
       <div class="panel">
         <header><h3>How the number is built</h3><span class="sub">Framework formula with this deal's values</span></header>
         <div id="alerts1"></div>
-        <div id="gapFinder"></div>
         <div class="working" id="steps1"></div>
         <div class="loc-table">
           <table>
@@ -846,6 +851,12 @@ tr.sel td{background:var(--accent-soft)}
           </table>
         </div>
         <div class="check" id="fwCheck"></div>
+        <div id="coverPanel" style="margin-top:18px;border-top:1px solid var(--line);padding-top:14px">
+          <h3 style="margin:0 0 4px;font-size:16px">Gaps and best coverage</h3>
+          <div class="hint" style="margin-bottom:6px">What no one covers, and the layouts that cover the geographies best.</div>
+          <div id="gapFinder"></div>
+          <div id="bestCover"></div>
+        </div>
       </div>
     </div>
 
@@ -2252,7 +2263,7 @@ function defaultsRaw(){
   return {
     aiopsPf:{mode:"portfolio",from:1},aiBuildOnly:true,
     deal:"",active:0,method:"tower",bu:buDefaults(),
-    custExtra:[],shiftLimits:{on:false,from:6.5,to:21},region:"eu",custLoc:"c_uk",days:5,hours:24,start:0,tz:0,fteHours:40,util1:85,minSenior:1,weekendMode:"active",support:"active",prod:{on:true,pct:12,from:2,base:3},oncall1:15,ocMode:"flat",p1PerMonth:null,p1Hours:3,standby:10,
+    custExtra:[],shiftLimits:{on:false,from:6.5,to:21},coverStrategy:"cost",indiaShare:null,coverCap:9,region:"eu",custLoc:"c_uk",days:5,hours:24,start:0,tz:0,fteHours:40,util1:85,minSenior:1,weekendMode:"active",support:"active",prod:{on:true,pct:12,from:2,base:3},oncall1:15,ocMode:"flat",p1PerMonth:null,p1Hours:3,standby:10,
     perShift:{L2:1,L3:1},
     locations:[pickLoc("in"),pickLoc("ro")],
     backfill:true,
@@ -2290,7 +2301,7 @@ function blocksOf(st){const o=[];st.locations.forEach(l=>(l.win||[]).forEach(w=>
 /* the support window cut into equal slices of at most 8 hours, handed to the locations in order */
 function autoLayout(st,modes){
   if(st===S&&S.meta)S.meta.winManual=false;
-  if((st.custExtra||[]).length)return autoLayoutMask(st,modes);
+  if(!simpleGeo(st))return autoLayoutMask(st,modes);
   const hrs=Math.min(24,Math.max(1,+st.hours||24)), n=Math.max(1,Math.ceil(hrs/8)), len=hrs/n, L=st.locations.length, start=hmod(+st.start||0);
   st.locations.forEach(l=>{l.win=[]});
   if(!L)return;
@@ -2303,7 +2314,7 @@ function autoLayout(st,modes){
    so the window follows the sun. With nightsOnCall, hours outside 07:00–20:00 local are on call (P1 only) instead of active. */
 function bestFitLayout(st,nightsOnCall){
   if(st===S&&S.meta)S.meta.winManual=false;   /* a full layout replaces hand edits, so the next add or remove may lay out again */
-  if((st.custExtra||[]).length||limitsOf(st).on)return bestFitMask(st,nightsOnCall);
+  if(!simpleGeo(st)||limitsOf(st).on)return bestFitMask(st,nightsOnCall);
   const L=st.locations, hrs=Math.min(24,Math.max(1,+st.hours||24)), start=hmod(+st.start||0), N=Math.round(hrs*2);
   L.forEach(l=>{l.win=[]});
   if(!L.length)return;
@@ -2329,21 +2340,40 @@ function winMask(st,utc,s,h){
   for(let k=0;k<n;k++)m[Math.floor(toCust(st,{utc:+utc||0},(+s||0)+k/2)*2)%NB]=true;
   return m;
 }
+/* The geographies to cover. A saved estimate has none of its own: its customer window (S.start, S.hours at the customer's location) and any extra locations are read as the geographies, so nothing moves.
+   Once the owner changes a geography, S.geos holds them all and S.start/S.hours mirror the first on the customer clock. */
+function geosOf(st){
+  if(Array.isArray(st.geos)&&st.geos.length)return st.geos;
+  return [{id:"g0",region:st.region,loc:st.custLoc||"",utc:+st.tz||0,s:hmod(+st.start||0),h:Math.min(24,Math.max(0,+st.hours||0))}].concat(st.custExtra||[]);
+}
+const simpleGeo=st=>{const g=geosOf(st);return g.length===1&&(+g[0].utc||0)===(+st.tz||0)};
+function syncGeos(st){
+  const g=st.geos;if(!Array.isArray(g)||!g.length)return;
+  st.hours=Math.min(24,Math.max(1,Math.round(+g[0].h||8)));st.start=hmod(toCust(st,{utc:+g[0].utc||0},+g[0].s||0));
+}
+function ensureGeos(){
+  if(!Array.isArray(S.geos)||!S.geos.length){
+    S.geos=geosOf(S).map((g,i)=>({id:i===0?"g0":g.id,region:g.region,loc:g.loc||"",utc:+g.utc||0,s:hmod(+g.s||0),h:Math.min(24,Math.max(1,Math.round(+g.h||8)))}));
+    S.custExtra=[];
+  }
+  syncGeos(S);
+}
 function reqMaskOf(st){
-  const req=winMask(st,st.tz,st.start,st.hours);
-  (st.custExtra||[]).forEach(e=>{const x=winMask(st,e.utc,e.s,e.h);for(let b=0;b<48;b++)if(x[b])req[b]=true});
+  const req=Array(48).fill(false);
+  geosOf(st).forEach(g=>{const x=winMask(st,g.utc,g.s,g.h);for(let b=0;b<48;b++)if(x[b])req[b]=true});
   return req;
 }
 /* the customer locations with their own local hours: the primary one, then the others */
+const custName=st=>{const RG=REGIONS[st.region];return RG?((RG.cust.find(c=>c[0]===st.custLoc)||[])[1]||RG.name):"customer"};
 function custList(st){
   const mk=(region,loc,utc,s,h,primary)=>{const RG=REGIONS[region]||{},c=(RG.cust||[]).find(x=>x[0]===loc);return {region:RG.name||"",name:c?c[1]:(RG.name||"Customer"),utc,s,h,primary,mask:winMask(st,utc,s,h)}};
-  return [mk(st.region,st.custLoc,+st.tz||0,hmod(+st.start||0),Math.min(24,Math.max(0,+st.hours||0)),true)].concat((st.custExtra||[]).map(e=>mk(e.region,e.loc,+e.utc||0,hmod(+e.s||0),e.h,false)));
+  return geosOf(st).map((g,i)=>mk(g.region,g.loc,+g.utc||0,hmod(+g.s||0),g.h,i===0));
 }
 const custText=st=>custList(st).map(c=>`${c.name} (${utcLabel(c.utc)}) ${clock(c.s)} to ${clock(c.s+c.h)} local`).join("; ");
 const limitsText=st=>{const L=limitsOf(st);return L.on?`each delivery location works only ${clock(L.from)} to ${clock(L.to)} in its own local time, with no late-night shifts`:""};
 const h1s=x=>fmt(x,1).replace(/\.0$/,"");
 /* where the timeline starts: the primary window's start, or the start of the first required stretch when there are other customer locations */
-function tlStart(){const r=(S.custExtra||[]).length?reqRuns(S):[];return r.length?r[0][0]/2:hmod(+S.start||0)}
+function tlStart(){const r=!simpleGeo(S)?reqRuns(S):[];return r.length?r[0][0]/2:hmod(+S.start||0)}
 const reqHoursOf=st=>reqMaskOf(st).filter(Boolean).length/2;
 /* the required hours as runs of consecutive buckets: [first bucket, count]; a run may wrap past midnight, and a full day is one run */
 function reqRuns(st){return maskRuns(reqMaskOf(st))}
@@ -2364,17 +2394,37 @@ function autoLayoutMask(st,modes){
   reqRuns(st).forEach(([b,c])=>{const hrs=c/2,n=Math.max(1,Math.ceil(hrs/8)),len=hrs/n;for(let j=0;j<n;j++)slices.push([b/2+j*len,len])});
   slices.forEach(([c0,len],i)=>{const l=st.locations[Math.min(L-1,Math.floor(i*L/slices.length))],s=toLocal(st,l,c0);l.win.push({id:uid(),m:(modes&&modes[i])==="oncall"?"oncall":"active",s,e:s+len})});
 }
-function bestFitMask(st,nightsOnCall){
-  const L=st.locations, m=reqMaskOf(st), NB=48, runs=reqRuns(st);
+function bestFitMask(st,nightsOnCall,prefId,cap,strict,maxH){
+  const L=st.locations, pi=prefId?L.findIndex(l=>l.id===prefId):-1, m=reqMaskOf(st), NB=48, runs=reqRuns(st);
   L.forEach(l=>{l.win=[]});
   if(!L.length||!runs.length)return;
   const key=Array(NB).fill(-1);
   const lim=limitsOf(st);
-  for(let b=0;b<NB;b++)if(m[b]){
+  const maxN=maxH>0?Math.floor(maxH*2+1e-9):Infinity, used=L.map(()=>0);   /* a location works at most maxH hours a day; what is left stays uncovered */
+  const dist=(l,c)=>{const x=hmod(toLocal(st,l,c)-13);return Math.min(x,24-x)};
+  /* the preferred location (India in the cost plan) takes the hours it may work that are nearest its own daytime, up to a share of the required hours when a cap is set */
+  let allow=null;
+  if(pi>=0){
+    const total=m.filter(Boolean).length, capN=Math.min(maxN,cap==null?Infinity:Math.floor(cap*total+1e-9));
+    const el=[];for(let b=0;b<NB;b++)if(m[b]&&inLimits(st,L[pi],b/2))el.push([dist(L[pi],b/2),b]);
+    el.sort((a,c)=>a[0]-c[0]||a[1]-c[1]);
+    allow=new Set(el.slice(0,capN).map(e=>e[1]));used[pi]=allow.size;
+  }
+  /* buckets are handed out nearest-to-daytime first, so each location fills the hours around its own midday */
+  const order=[];for(let b=0;b<NB;b++)if(m[b]){let bd=99;L.forEach((l,i)=>{if(inLimits(st,l,b/2))bd=Math.min(bd,dist(l,b/2))});order.push([bd,b])}
+  order.sort((a,c)=>a[0]-c[0]||a[1]-c[1]);
+  for(const [,b] of order){
     const c=b/2;let best=-1,bd=99,near=0,nd=99;
-    L.forEach((l,i)=>{const x=hmod(toLocal(st,l,c)-13),d=Math.min(x,24-x);
+    L.forEach((l,i)=>{const d=dist(l,c);
       if(d<nd-1e-9){nd=d;near=i}
+      if(i===pi&&allow&&!allow.has(b))return;
+      if(i!==pi&&used[i]>=maxN)return;
       if(inLimits(st,l,c)&&d<bd-1e-9){bd=d;best=i}});
+    if(pi>=0&&allow.has(b))best=pi;
+    else{
+      if(pi>=0&&best<0&&!strict&&inLimits(st,L[pi],c)&&used[pi]<maxN)best=pi;   /* nobody else may work it: India takes it even above the share, rather than leave a gap */
+      if(best>=0)used[best]++;
+    }
     if(best>=0){const loc=toLocal(st,L[best],c);key[b]=best*2+(!lim.on&&nightsOnCall&&(loc<7||loc>=20)?1:0)}
     else if(nightsOnCall)key[b]=near*2+1;   /* nobody may work it inside the limits: P1 on call at the location nearest its daytime */
     /* otherwise left unassigned: a gap */
@@ -2390,7 +2440,7 @@ function bestFitMask(st,nightsOnCall){
     l.win.push({id:uid(),m:key[b]&1?"oncall":"active",s,e:s+c/2});i+=c;
   }
 }
-const WIN_PRESETS=[["Day","09:00–17:00",9,17],["Late","13:00–21:00",13,21],["Night","21:00–05:00",21,29]];
+const WIN_PRESETS=[["Day","09:00–18:00",9,18],["Late","12:00–21:00",12,21],["Night","21:00–05:00",21,29]];
 /* hour-by-hour picture on the customer clock: who is active, who is on call, where the window is uncovered and where two locations overlap */
 function coverageOf(st){
   const NB=48, req=reqMaskOf(st), hrs=req.filter(Boolean).length/2, start=hmod(+st.start||0);
@@ -2469,8 +2519,12 @@ function migrate(p){
         n.clauseIds=Array.isArray(t.clauseIds)?t.clauseIds.filter(x=>typeof x==="string"):[];return n});
       /* contract clauses: estimates saved before this feature have none */
       st.clauses=cleanClauses(p.clauses);
+      st.coverStrategy=p.coverStrategy==="local"?"local":"cost";
+      st.coverCap=(p.coverCap===null||p.coverCap===undefined||p.coverCap===""||!isFinite(+p.coverCap))?9:Math.min(24,Math.max(1,Math.round(+p.coverCap)));
+      st.indiaShare=(p.indiaShare===null||p.indiaShare===undefined||p.indiaShare===""||!isFinite(+p.indiaShare))?null:Math.min(100,Math.max(0,Math.round(+p.indiaShare)));
       st.shiftLimits=cleanLimits(p.shiftLimits);   /* shift limits: off for an estimate saved before they existed */
-      st.custExtra=cleanExtra(p.custExtra);   /* other customer locations: estimates saved before have none */
+      st.custExtra=cleanExtra(p.custExtra);
+      st.geos=cleanExtra(p.geos);if(st.geos.length){st.custExtra=[];syncGeos(st)}else delete st.geos;   /* other customer locations: estimates saved before have none */
       /* sizing method: estimates saved before the choice are tower based and have no bottom-up inputs */
       st.method=p.method==="bottomup"?"bottomup":"tower";st.bu=cleanBU(p.bu);
       st.meta=Object.assign(defaults().meta,p.meta||{});
@@ -2506,7 +2560,11 @@ function migrateCoverage(st,p){
 function inputsHash(){
   const o=Object.assign({},S);delete o.meta;delete o.active;
   if(o.method!=="bottomup"){delete o.method;delete o.bu}   /* a tower estimate's fingerprint is the same as before the method choice existed, so an earlier approval stays valid */
-  if(!(o.custExtra||[]).length)delete o.custExtra;   /* the coverage fields added later are left out while unused, so an earlier approval stays valid */
+  if(!(o.custExtra||[]).length)delete o.custExtra;
+  if(!(o.geos||[]).length)delete o.geos;
+  if(o.indiaShare===null||o.indiaShare===undefined)delete o.indiaShare;
+  if(+o.coverCap===9||o.coverCap===undefined)delete o.coverCap;   /* the default window length leaves an earlier approval valid */
+  if(o.coverStrategy!=="local")delete o.coverStrategy;   /* the default strategy leaves an earlier approval valid */   /* the coverage fields added later are left out while unused, so an earlier approval stays valid */
   if(!limitsOf(S).on)delete o.shiftLimits;
   o.cov=Object.fromEntries(Object.entries(S.cov||{}).filter(([,v])=>v.shifts.length||v.people!==1||(v.p&&Object.keys(v.p).length)));
   const str=JSON.stringify(o);let h=5381;for(let i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))|0;
@@ -3028,7 +3086,7 @@ function ownedText(t){const o=ownOf(t);const k=["L1","L2","L3"].filter(x=>o[x]==
 const TOWER_KEYS=["sre","vol","inc","sr","cr","srMix","crMix","tktLevel","levels","own","sla","avail","mix","cpx","apps","env","host","db","sec","dp","pipe","integ","up","down","agents","models","tools","ksrc","hiRisk","mau","estate","aiops","enh","basis","thin","l15","l15Fte","sreFte","special"];
 function provVal(key){
   if(key==="client")return S.deal;
-  if(key==="coverage")return `${S.hours}x${S.days}|${S.locations.flatMap(l=>(l.win||[]).map(w=>w.m)).join(",")}|${S.weekendMode}|${S.support}`+((S.custExtra||[]).length?"|"+S.custExtra.map(e=>`${e.region}:${e.utc}:${e.s}:${e.h}`).join(","):"")+(limitsOf(S).on?`|limits:${limitsOf(S).from}-${limitsOf(S).to}`:"");
+  if(key==="coverage")return `${S.hours}x${S.days}|${S.locations.flatMap(l=>(l.win||[]).map(w=>w.m)).join(",")}|${S.weekendMode}|${S.support}`+(!simpleGeo(S)?"|"+geosOf(S).map(e=>`${e.region}:${e.utc}:${e.s}:${e.h}`).join(","):"")+(limitsOf(S).on?`|limits:${limitsOf(S).from}-${limitsOf(S).to}`:"");
   if(key==="p1")return String(S.p1PerMonth);
   if(key==="ai")return S.aiMaturity;
   if(key==="cplx")return S.cplx;
@@ -3783,16 +3841,23 @@ function runSelfTests(){
     add("Several customer locations: both layouts cover every required hour, and nothing is staffed outside it","India and Ecuador over the 21 h union: no gap, 21 h active, none outside, 105 window hours a week (21 × 5)",`best fit gap ${bf.gap}, active ${bf.act}, outside ${bf.out}, reqH ${bf.reqH}; even slices gap ${al.gap}, active ${al.act}`,bf.gap===0&&near(bf.act,21)&&bf.out===0&&bf.reqH===105&&al.gap===0&&near(al.act,21),"invariant");
     const par=withState(testState(st=>{eu3(st);st.locations=[pickLoc("in"),pickLoc("ec")];st.util1=85;st.backfill=true;bestFitLayout(st,false)}),R=>{const b=baseTeamOf(S);return near(b.buffered,R.buffered,1e-9)&&near(b.risked,R.s1,1e-9)});
     add("Several customer locations: the bottom-up base team still equals compute()","baseTeamOf equals compute() with three customer locations",String(par),par,"invariant");
-    const sink=withState(testState(st=>{st.region="eu";st.custExtra=[]}),()=>{const out={};
-      toggleRegion("apac");out.add=S.custExtra.map(e=>e.region).join()+"|"+S.locations.length;
-      toggleRegion("na");out.add2=S.custExtra.map(e=>e.region).join();
-      toggleRegion("apac");out.rm=S.custExtra.map(e=>e.region).join();
-      toggleRegion("eu");out.promote=S.region+"|"+S.tz+"|"+S.custExtra.length;
-      toggleRegion("na");out.last=S.region+"|"+S.custExtra.length;
+    const sink=withState(testState(st=>{st.region="eu";st.custLoc="c_uk";st.tz=0;st.start=9;st.hours=9;st.custExtra=[]}),()=>{const out={};
+      toggleGeo("apac");out.add=geosOf(S).map(e=>e.region).join()+"|"+S.locations.length+"|"+geosOf(S)[1].h+"|"+geosOf(S)[1].s;
+      toggleGeo("na");out.add2=geosOf(S).map(e=>e.region).join();
+      toggleGeo("apac");out.rm=geosOf(S).map(e=>e.region).join();
+      toggleGeo("eu");out.drop=geosOf(S).map(e=>e.region).join()+"|"+S.region+"|"+S.tz;
+      toggleGeo("na");out.last=geosOf(S).map(e=>e.region).join();
       return out});
-    add("Several customer locations: clicking a region adds it, clicking again removes it, and the primary hands over","add APAC and NA (no delivery location added), remove APAC, click the primary: NA becomes primary on its own clock, and the only region cannot be removed",JSON.stringify(sink),sink.add==="apac|2"&&sink.add2==="apac,na"&&sink.rm==="na"&&sink.promote==="na|-5|0"&&sink.last==="na|0","proposed");
-    const swap=withState(testState(st=>{eu3(st)}),()=>{const h0=reqHoursOf(S);promoteExtra("a");return {h0,h1:reqHoursOf(S),region:S.region,tz:S.tz,old:S.custExtra.find(e=>e.region==="eu")}});
-    add("Several customer locations: making another one primary changes the clock but not the hours required","APAC becomes primary on UTC+8; EU stays as an extra; the union is still 21 h",`${swap.h0} then ${swap.h1} h; primary ${swap.region} at UTC${swap.tz}`,swap.h0===21&&swap.h1===21&&swap.region==="apac"&&swap.tz===8&&swap.old&&swap.old.utc===1,"invariant");
+    add("Geographies to cover: clicking one adds it at 09:00 for 9 hours, clicking again removes it, and the customer location does not move","add APAC (09:00, 9 h, no delivery location added) and NA, remove APAC, remove EU: the customer stays EU on UTC+0, and the last geography cannot be removed",JSON.stringify(sink),sink.add==="eu,apac|2|9|9"&&sink.add2==="eu,apac,na"&&sink.rm==="eu,na"&&sink.drop==="na|eu|0"&&sink.last==="na","proposed");
+    const swap=withState(testState(st=>{eu3(st)}),()=>{const h0=reqHoursOf(S);holdGeos();S.region="na";S.custLoc="c_use";S.tz=-5;followCustomer();return {h0,h1:reqHoursOf(S),n:geosOf(S).length,utc:geosOf(S)[0].utc}});
+    add("Geographies to cover: changing the customer location changes the clock but not the hours required","the customer moves from EU to the US East coast; the three geographies keep their own hours; the union is still 21 h",`${swap.h0} then ${swap.h1} h; ${swap.n} geographies`,swap.h0===21&&swap.h1===21&&swap.n===3,"invariant");
+    const sepa=withState(testState(st=>{st.region="eu";st.custLoc="c_uk";st.tz=0;st.start=9;st.hours=9;st.custExtra=[]}),()=>{const r0=reqHoursOf(S);toggleGeo("apac");toggleGeo("eu");S.region="eu";return {r0,h:reqHoursOf(S),regs:geosOf(S).map(g=>g.region).join(),clock:S.tz}});
+    add("Geographies to cover: the customer can sit in a region that is not covered","a UK customer asking for APAC cover only: 9 h a day, the customer clock stays UTC+0",`${sepa.regs}: ${sepa.h} h on UTC${sepa.clock}`,sepa.regs==="apac"&&sepa.h===9&&sepa.clock===0,"invariant");
+    const legacy=withState(testState(st=>{eu3(st)}),()=>{const g=geosOf(S);return {n:g.length,regs:g.map(x=>x.region).join(),first:g[0].region+"|"+g[0].h,h:reqHoursOf(S),hash:inputsHash()}});
+    const legacyH=withState(testState(st=>{eu3(st)}),()=>{ensureGeos();return {n:geosOf(S).length,h:reqHoursOf(S),ex:S.custExtra.length}});
+    add("An estimate saved with a customer window and extra locations reads them as its geographies, with no number moved","3 geographies, 21 h before and after they are held in the new list",`${legacy.n} then ${legacyH.n}; ${legacy.h} then ${legacyH.h} h`,legacy.n===3&&legacy.regs==="eu,apac,na"&&legacy.h===21&&legacyH.n===3&&legacyH.h===21&&legacyH.ex===0,"migration");
+    const mgG=migrate(Object.assign(JSON.parse(JSON.stringify(testState(st=>{}))),{geos:[{id:"x",region:"apac",loc:"c_sg",utc:8,s:9,h:9},{region:"mars"},{id:"y",region:"na",loc:"c_use",utc:-5,s:9,h:9}]}));
+    add("Saved geographies are cleaned, and an estimate without them has none of its own","unknown regions dropped, two kept; an older estimate has no geos key",`${(mgG.geos||[]).length} kept; old ${migrate(JSON.parse(JSON.stringify(testState(st=>{})))).geos}`,(mgG.geos||[]).length===2&&migrate(JSON.parse(JSON.stringify(testState(st=>{})))).geos===undefined,"migration");
     const opts=withState(testState(st=>{eu3(st)}),()=>dlocOptions(S).map(o=>o[0]));
     add("Several customer locations: the delivery options are the regions' lists, each location once","EU, APAC and NA offer 9 locations, India once",opts.join(","),opts.length===9&&new Set(opts).size===9&&opts.filter(x=>x==="in").length===1&&["eu","ro","sg","au","cn","la","ec","br"].every(x=>opts.includes(x)),"proposed");
     const mg=migrate(Object.assign(JSON.parse(JSON.stringify(testState(st=>{}))),{custExtra:[{id:"a",region:"apac",utc:99,s:30,h:99},{region:"mars"},"junk",null,{id:"c",region:"na",utc:-5,s:9,h:8}].concat(Array(6).fill({region:"eu",utc:0,s:9,h:8}))}));
@@ -3849,8 +3914,8 @@ function runSelfTests(){
   {
     const hs=withState(testState(()=>{}),()=>{const a=inputsHash();S.custExtra=[];S.shiftLimits={on:false,from:7,to:20};const b=inputsHash();S.shiftLimits={on:true,from:6.5,to:21};const c=inputsHash();S.shiftLimits={on:false,from:6.5,to:21};S.custExtra=[{id:"a",region:"apac",loc:"c_sg",utc:8,s:9,h:8}];const d=inputsHash();return [a,b,c,d]});
     add("An approval made before the coverage fields is still valid: unused extras and limits that are off do not change the fingerprint","same fingerprint with empty extras and limits off; different with limits on or an extra location",`${hs[0]===hs[1]}, ${hs[0]!==hs[2]}, ${hs[0]!==hs[3]}`,hs[0]===hs[1]&&hs[0]!==hs[2]&&hs[0]!==hs[3],"invariant");
-    const pr=withState(testState(st=>{st.region="eu";st.custLoc="c_uk";st.tz=0;st.locations=["ro","in"].map(pickLoc);st.custExtra=[{id:"a",region:"apac",loc:"c_sg",utc:8,s:9,h:8}]}),()=>{toggleRegion("eu");return {r:S.region,l:S.locations.map(l=>l.id).join()}});
-    add("Removing the primary region drops delivery locations the new regions do not offer","EU with Romania and India, then APAC only: India stays, Romania goes",`${pr.r}: ${pr.l}`,pr.r==="apac"&&pr.l==="in","invariant");
+    const pr=withState(testState(st=>{st.region="eu";st.custLoc="c_uk";st.tz=0;st.locations=["ro","in"].map(pickLoc);st.custExtra=[{id:"a",region:"apac",loc:"c_sg",utc:8,s:9,h:8}]}),()=>{toggleGeo("eu");return {r:S.region,l:S.locations.map(l=>l.id).join()}});
+    add("Removing a geography drops delivery locations the others do not offer","EU with Romania and India, then APAC only: India stays, Romania goes, the customer stays in EU",`${pr.r}: ${pr.l}`,pr.r==="eu"&&pr.l==="in","invariant");
     const lm=cleanLimits({on:true,from:6.5,to:24});
     add("A latest end of 24:00 is kept","to stays 24",String(lm.to),lm.to===24,"invariant");
   }
@@ -3865,6 +3930,59 @@ function runSelfTests(){
     add("Hand-edited windows stay when a delivery location is added or removed","India's windows unchanged after adding then removing Latin America; the new location gets windows for the gap only and closes it",`same ${man.same}, gap ${man.g}, ${man.lw} windows, ${man.n} location, flag ${man.flag}`,man.same&&man.g===0&&man.lw>0&&man.n===1&&man.flag===true,"invariant");
     const auto=withState(testState(st=>{eu3(st);st.locations=[pickLoc("in")];st.shiftLimits={on:true,from:6.5,to:21};bestFitLayout(st,false)}),()=>{const before=!!S.meta.winManual;changeDelivery("la",true);return {before,locs:S.locations.map(l=>l.id).join(),g:coverageOf(S).gapH}});
     add("Without hand edits, adding a delivery location still lays everything out","flag off; India and Latin America share the window with no gap",`flag ${auto.before}; ${auto.locs}; gap ${auto.g}`,auto.before===false&&auto.locs==="in,la"&&auto.g===0,"invariant");
+  }
+  /* best coverage: two strategies, no night shifts, India first in the cost plan */
+  {
+    const bc=(mod)=>testState(st=>{st.region="eu";st.custLoc="c_uk";st.tz=0;st.days=5;st.start=9;st.hours=8;st.custExtra=[{id:"a",region:"apac",loc:"c_sg",utc:8,s:9,h:8},{id:"b",region:"na",loc:"c_use",utc:-5,s:9,h:8}];st.locations=["eu","ro","in"].map(pickLoc);if(mod)mod(st)});
+    const ids=r=>r.st.locations.map(l=>l.id).join();
+    const cost=withState(bc(),()=>layoutCandidates(S));
+    const c0=cost.rows[0];
+    add("Best coverage, cost optimized (the default): India works every hour it may and a few locations close the rest","India in the plan, at most 3 other locations, no gap, no overlap, no night shift, India the largest single share, and the plan leads",`${c0.label}: ${ids(c0)}; gap ${c0.m.gap}, overlap ${c0.m.overlap}, night ${c0.m.night}, India ${Math.round(c0.m.india*100)}%`,cost.strat==="cost"&&/Cost optimized/.test(c0.label)&&c0.st.locations.some(l=>l.id==="in")&&c0.st.locations.length<=4&&c0.m.gap===0&&c0.m.overlap===0&&c0.m.night===0&&c0.m.india>0.3,"proposed");
+    const loc=withState(bc(st=>{st.coverStrategy="local"}),()=>layoutCandidates(S));
+    const l0=loc.rows[0];
+    add("Best coverage, local coverage: each geography gets a delivery location in or near it","Germany, Singapore and Ecuador, no India, no gap, no night shift",`${l0.label}: ${ids(l0)}; gap ${l0.m.gap}, India ${Math.round(l0.m.india*100)}%`,loc.strat==="local"&&/Local/.test(l0.label)&&ids(l0)==="eu,sg,ec"&&l0.m.gap===0&&l0.m.night===0&&l0.m.india===0,"proposed");
+    const night=withState(bc(st=>{st.locations=[pickLoc("in")];st.locations[0].win=[{id:"w",m:"active",s:21,e:29}]}),()=>layoutCandidates(S));
+    const cur=night.rows.find(r=>r.label==="Current setup");
+    add("Best coverage: a layout with a night shift never leads","a current setup with an active window from 21:00 to 05:00 is flagged and ranked below the plan",`current night ${cur.m.night}; leader ${night.rows[0].label}`,cur.m.night>0&&night.rows[0].label!==cur.label&&night.rows[0].m.night===0&&night.rows[night.rows.length-1].label==="Current setup","invariant");
+    const one=withState(bc(st=>{st.coverStrategy="local"}),()=>layoutCandidates(S));
+    add("Best coverage: identical layouts are shown once","local coverage: the follow-the-sun row equals the plan and is merged away",`${one.rows.length} rows: ${one.rows.map(r=>r.label).join(" | ")}`,!one.rows.some(r=>r.label==="Same locations, follow the sun"),"invariant");
+    const pas=withState(bc(st=>{st.support="passive"}),()=>layoutCandidates(S));
+    add("Best coverage: the P1 on-call row appears only under Active–passive","passive lists it only if its windows differ; active never lists it",`${pas.rows.length} rows (passive) vs ${cost.rows.length} (active)`,!cost.rows.some(r=>/on call/.test(r.label)),"invariant");
+    const ap=withState(bc(),()=>{const rows=layoutCandidates(S).rows;BC_ROWS=rows;const before={geos:JSON.stringify(S.geos),custExtra:JSON.stringify(S.custExtra),region:S.region,tz:S.tz};applyLayout(0);const gapA=coverageOf(S).gapH;return {same:before.custExtra===JSON.stringify(S.custExtra)&&before.region===S.region&&before.tz===S.tz,locs:S.locations.map(l=>l.id).join(),lim:S.shiftLimits.on,gapA,flag:!!S.meta.winManual}});
+    add("Best coverage: Apply sets the locations, windows and limits and leaves the geographies and the customer alone","India plus the closing location, limits on, no gap, customer and geographies unchanged",`${ap.locs}; limits ${ap.lim}; gap ${ap.gapA}`,ap.same&&ap.locs.startsWith("in")&&ap.lim===true&&ap.gapA===0&&ap.flag===false,"invariant");
+    const mg=migrate(JSON.parse(JSON.stringify(testState(()=>{}))));
+    const h1=withState(bc(),()=>inputsHash()), h2=withState(bc(st=>{st.coverStrategy="local"}),()=>inputsHash());
+    add("The coverage strategy defaults to cost optimized for an older estimate and does not touch its approval","migrate gives cost; the default leaves the fingerprint as it was, local changes it",`${mg.coverStrategy}; ${h1===h2?"same":"different"}`,mg.coverStrategy==="cost"&&h1!==h2,"migration");
+    const alone=withState(bc(st=>{st.locations=[pickLoc("in")];st.shiftLimits={on:true,from:6.5,to:21};bestFitLayout(st,false)}),()=>layoutCandidates(S));
+    const cur2=alone.rows.find(r=>r.label==="Current setup");
+    add("Best coverage: India alone leaves a gap that the plan closes","the current setup (India alone) has uncovered hours; the plan has none and leads",`current gap ${cur2?cur2.m.gap:"none"}; leader gap ${alone.rows[0].m.gap}`,cur2&&cur2.m.gap>0&&alone.rows[0].m.gap===0,"invariant");
+  }
+  /* India share and Ecuador as the next preferred location */
+  {
+    const bc=(mod)=>testState(st=>{st.region="eu";st.custLoc="c_uk";st.tz=0;st.days=5;st.start=9;st.hours=8;st.custExtra=[{id:"a",region:"apac",loc:"c_sg",utc:8,s:9,h:8},{id:"b",region:"na",loc:"c_use",utc:-5,s:9,h:8}];st.locations=["eu","ro","in"].map(pickLoc);if(mod)mod(st)});
+    const ids=r=>r.st.locations.map(l=>l.id).join();
+    const full=withState(bc(),()=>layoutCandidates(S).rows[0]);
+    add("Cost optimized: Ecuador is the next choice after India for US hours","India then Ecuador, never Latin America or Brazil, no gap",`${ids(full)}; gap ${full.m.gap}`,ids(full).startsWith("in,ec")&&!/la|br/.test(ids(full))&&full.m.gap===0,"proposed");
+    const cap=withState(bc(st=>{st.indiaShare=25}),()=>layoutCandidates(S).rows[0]);
+    add("Cost optimized: a chosen India share caps India's hours and others take the rest","India share 25%: at most about a quarter, lower than the uncapped plan",`${Math.round(cap.m.india*100)}%; ${ids(cap)}; gap ${cap.m.gap}`,cap.m.india<=0.28&&cap.m.india<full.m.india,"proposed");
+    const none=withState(bc(st=>{st.indiaShare=null}),()=>layoutCandidates(S).rows[0]);
+    add("Cost optimized: an empty share means no cap, as before","same plan as the default",`${ids(none)} ${Math.round(none.m.india*100)}%`,ids(none)===ids(full)&&near(none.m.india,full.m.india,1e-9),"invariant");
+    const mgI=migrate(Object.assign(JSON.parse(JSON.stringify(testState(()=>{}))),{indiaShare:"250"})), mgN=migrate(JSON.parse(JSON.stringify(testState(()=>{}))));
+    const hA=withState(bc(),()=>inputsHash()), hB=withState(bc(st=>{st.indiaShare=50}),()=>inputsHash());
+    add("India share is cleaned on opening, empty for an older estimate, and left out of the approval while empty","250 becomes 100; an older estimate has none; the fingerprint changes only when a share is set",`${mgI.indiaShare}; ${mgN.indiaShare}; ${hA===hB?"same":"different"}`,mgI.indiaShare===100&&mgN.indiaShare===null&&hA!==hB,"migration");
+  }
+  /* a longest window per location */
+  {
+    const full24=(mod)=>testState(st=>{st.region="eu";st.custLoc="c_uk";st.tz=0;st.days=7;st.start=0;st.hours=24;st.custExtra=[{id:"a",region:"apac",loc:"c_sg",utc:8,s:0,h:24},{id:"b",region:"na",loc:"c_use",utc:-5,s:0,h:24}];st.locations=["in","ec"].map(pickLoc);if(mod)mod(st)});
+    const maxAct=r=>Math.max(...r.st.locations.map(l=>(l.win||[]).filter(w=>w.m!=="oncall").reduce((a,w)=>a+winLen(w),0)));
+    const f1=withState(full24(),()=>layoutCandidates(S));
+    const worst=Math.max(...f1.rows.filter(r=>r.label!=="Current setup").map(maxAct));
+    add("Longest window: no location works more than 9 hours a day in any best-coverage layout, and what is left is uncovered or taken by more locations","a 24-hour window with India and Ecuador: every plan row has windows of at most 9 h per location",`longest ${worst} h; plan ${f1.rows[0].st.locations.map(l=>l.id).join()} gap ${f1.rows[0].m.gap}`,worst<=9+1e-9&&f1.rows[0].st.locations.length>=3,"proposed");
+    const f2=withState(full24(st=>{st.locations=["in"].map(pickLoc);st.coverCap=9}),()=>{const c=planClone(S,["in","ec"]);bestFitMask(c,false,"in",undefined,false,9);return {gap:coverageOf(c).gapH,max:Math.max(...c.locations.map(l=>(l.win||[]).reduce((a,w)=>a+winLen(w),0)))}});
+    add("Longest window: India plus Ecuador alone cannot cover 24 hours, and the rest shows as uncovered","two locations at 9 h each leave 6 h uncovered",`${f2.max} h each; gap ${f2.gap} h`,f2.max<=9&&near(f2.gap,6,1e-9),"invariant");
+    const f3=withState(full24(st=>{st.coverCap=24}),()=>{const c=planClone(S,["in","ec"]);bestFitMask(c,false,"in");return coverageOf(c).gapH});
+    const mgc=migrate(Object.assign(JSON.parse(JSON.stringify(testState(()=>{}))),{coverCap:"400"})), mgd=migrate(JSON.parse(JSON.stringify(testState(()=>{}))));
+    add("Longest window: no cap argument keeps the old layout, and the setting is cleaned and defaults to 9","an uncapped India plus Ecuador covers 24 h; 400 becomes 24; an older estimate gets 9",`gap ${f3}; ${mgc.coverCap}; ${mgd.coverCap}`,f3===0&&mgc.coverCap===24&&mgd.coverCap===9,"migration");
   }
   /* outputs and timelines (coverage plan, Phase D) */
   {
@@ -4168,7 +4286,7 @@ const buKey=a=>[a.ref,a.name].map(v=>String(v||"").trim().toLowerCase().replace(
 /* ---------- bottom-up screens (steps 20 to 24) ---------- */
 let BUC=null,BUK="";
 /* the inputs bottom-up shares with the tower method; the cached result must change when any of them does */
-const buShared=()=>[S.days,S.hours,S.start,S.tz,S.fteHours,S.util1,S.perShift,S.weekendMode,S.support,S.backfill,S.ocMode,S.oncall1,S.p1PerMonth,S.p1Hours,S.standby,S.locations,S.sdmLoc,S.region,S.custLoc,S.custExtra,S.shiftLimits,S.cplx,S.contPct,S.cont2,S.pyr,S.sdmRatio,S.ex,S.exTol,S.rounding,S.risks&&S.risks.s1,S.conf];
+const buShared=()=>[S.days,S.hours,S.start,S.tz,S.fteHours,S.util1,S.perShift,S.weekendMode,S.support,S.backfill,S.ocMode,S.oncall1,S.p1PerMonth,S.p1Hours,S.standby,S.locations,S.sdmLoc,S.region,S.custLoc,S.custExtra,S.geos,S.shiftLimits,S.cplx,S.contPct,S.cont2,S.pyr,S.sdmRatio,S.ex,S.exTol,S.rounding,S.risks&&S.risks.s1,S.conf];
 function buR(){const k=JSON.stringify([S.bu,buShared()]);if(!BUC||k!==BUK){BUK=k;BUC=computeBU()}return BUC}
 const buN=(f,id,v,o)=>{o=o||{};return `<input type="number" class="${o.cls||"w-s"}" data-bu="${f}"${id!=null?` data-bid="${esc(id)}"`:""}${o.i!=null?` data-bi="${o.i}"`:""} min="${o.min!=null?o.min:0}"${o.max!=null?` max="${o.max}"`:""} step="${o.step||"any"}" value="${v==null?"":esc(v)}" aria-label="${esc(o.label||f)}"${o.ph?` placeholder="${esc(o.ph)}"`:""}>`};
 const buT=(f,id,v,o)=>{o=o||{};return `<input type="text" data-bu="${f}"${id!=null?` data-bid="${esc(id)}"`:""} value="${esc(v||"")}" aria-label="${esc(o.label||f)}"${o.list?` list="${o.list}"`:""}${o.ph?` placeholder="${esc(o.ph)}"`:""} style="${o.w?"width:"+o.w:"width:100%"}">`};
@@ -4600,7 +4718,7 @@ function addDeliveryLocation(id){changeDelivery(id,true)}
 function gapFinderHtml(st){
   const g=suggestLocations(st), rg=r=>r.map(([b,c])=>`${clock(b/2)} to ${clock((b+c)/2)}`).join(" and "), h1=x=>String(+x.toFixed(1));
   const RGp=REGIONS[st.region], pn=RGp?((RGp.cust.find(c=>c[0]===st.custLoc)||[])[1]||RGp.name):"customer";
-  if(!g.hours)return limitsOf(st).on||(st.custExtra||[]).length?`<div class="hint" style="color:var(--add);margin:6px 0">No gap: every required hour has someone active or on call.</div>`:"";
+  if(!g.hours)return limitsOf(st).on||!simpleGeo(st)?`<div class="hint" style="color:var(--add);margin:6px 0">No gap: every required hour has someone active or on call.</div>`:"";
   const row=(x,extra)=>`<div class="row" style="justify-content:space-between;gap:8px;margin:4px 0"><span><b>${esc(x.name)}</b> · ${esc(x.kind)} · ${utcLabel(x.utc)}<small style="display:block;color:var(--muted)">${extra}${x.inRegion?" · offered for your customer regions":""}</small></span><button type="button" class="btn sm" data-addsug="${esc(x.id)}">Add</button></div>`;
   let h=`<div style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:8px 0;background:var(--surface-2)"><b>Gaps and how to close them</b>
     <div class="hint" style="margin:4px 0 6px">${h1(g.hours)} uncovered hours on the ${esc(pn)} clock: ${rg(g.gaps.map(([a,b])=>[a*2,(b-a)*2]))}. A location added here works ${clock(g.limits.from)} to ${clock(g.limits.to)} in its own local time${g.limits.assumed?" (the shift limits are off, so this is assumed)":""}.</div>`;
@@ -4609,46 +4727,143 @@ function gapFinderHtml(st){
   if(g.left.hours>0)h+=`<div class="hint" style="margin-top:6px">${h1(g.left.hours)} hours (${rg(g.left.ranges)}) cannot be staffed inside ${clock(g.limits.from)} to ${clock(g.limits.to)} by any location in the list. Widen the limits, or choose Active–passive to cover them on call for P1.</div>`;
   return h+"</div>";
 }
-function updateGapFinder(){const el=$("gapFinder");if(el)el.innerHTML=gapFinderHtml(S)}
+function updateGapFinder(){const el=$("gapFinder"),b=$("bestCover");if(el)el.innerHTML=gapFinderHtml(S);if(b)b.innerHTML=bestCoverageHtml(S);const pn=$("coverPanel");if(pn)pn.hidden=!((el&&el.innerHTML)||(b&&b.innerHTML))}
+/* ---------- best coverage: compare layouts for the chosen geographies and delivery locations ----------
+   Every candidate is built on a copy of the estimate, so nothing changes until Apply. No night shifts: the shift limits
+   (the owner's, or 06:30 to 21:00) are always applied. Regular hours are 09:00 to 18:00 local. */
+const REG0=9, REG1=18;
+function offDayHours(st){
+  let n=0;
+  st.locations.forEach(l=>(l.win||[]).forEach(w=>{if(w.m==="oncall")return;const k=Math.round(winLen(w)*2);for(let i=0;i<k;i++){const t=hmod((+w.s)+i/2);if(!(t>=REG0-1e-9&&t+0.5<=REG1+1e-9))n++}}));
+  return n/2;
+}
+function indiaShare(st){
+  let a=0,t=0;
+  st.locations.forEach(l=>(l.win||[]).forEach(w=>{if(w.m==="oncall")return;const h=winLen(w);t+=h;if(l.id==="in")a+=h}));
+  return t?a/t:0;
+}
+const forcedLimits=st=>{const L=limitsOf(st);return {on:true,from:L.from,to:L.to}};   /* the owner's limits when on, otherwise 06:30 to 21:00 */
+function planClone(st,ids){
+  const c=clone(st);c.shiftLimits=forcedLimits(st);
+  c.locations=ids.map(id=>(st.locations.find(l=>l.id===id)?clone(st.locations.find(l=>l.id===id)):pickLoc(id)));
+  c.locations.forEach(l=>{l.win=[]});
+  return c;
+}
+const NEXT_PREFERRED=["ec"];   /* after India, Ecuador is the preferred location for US hours (the owner's choice) */
+const indiaCapOf=st=>st.indiaShare==null?undefined:Math.max(0,Math.min(1,(+st.indiaShare||0)/100));
+const capHoursOf=st=>{const v=Math.round(+st.coverCap);return isFinite(v)&&v>=1&&v<=24?v:9};   /* the longest window a location works, hours (default 9) */
+/* cost optimized: India covers the hours it may work (up to the chosen share and the longest window); Ecuador is tried first, then whichever location closes the most, up to 3 more */
+function costPlan(st){
+  const cap=indiaCapOf(st), mx=capHoursOf(st), lay=(c,strict)=>bestFitMask(c,false,"in",cap,strict,mx), gapOf=x=>coverageOf(x).gapH;
+  const ids=["in"];let c=planClone(st,ids);lay(c,true);
+  const prio=[...new Set(NEXT_PREFERRED.concat(dlocOptions(st).map(o=>o[0])).concat(LOC_CATALOG.map(l=>l.id)))];
+  for(let k=0;k<3&&gapOf(c)>0;k++){
+    let best=null,bg=gapOf(c);
+    prio.filter(id=>!ids.includes(id)).forEach(id=>{const t=planClone(st,ids.concat(id));lay(t,true);const g=gapOf(t);if(g<bg-1e-9){bg=g;best={id,t}}});
+    if(!best)break;
+    ids.push(best.id);c=best.t;
+  }
+  const f=planClone(st,ids);lay(f,false);
+  return f;
+}
+/* local coverage: for each geography the delivery location in or nearest it; India only for hours they cannot cover */
+function localPlan(st){
+  const ids=[];
+  geosOf(st).forEach(g=>{
+    const RG=REGIONS[g.region];if(!RG)return;
+    const opts=RG.del.map(x=>x[0]).filter(id=>id!=="in");
+    let best=null,bd=99;
+    opts.forEach(id=>{const c=LOC_CATALOG.find(x=>x.id===id),d=Math.abs((+c.utc)-(+g.utc||0));if(d<bd-1e-9||(Math.abs(d-bd)<1e-9&&NEXT_PREFERRED.includes(id)&&!NEXT_PREFERRED.includes(best))){bd=d;best=id}});
+    const id=best||"in";if(!ids.includes(id))ids.push(id);
+  });
+  if(!ids.length)ids.push("in");
+  const mx=capHoursOf(st);
+  let c=planClone(st,ids);bestFitMask(c,false,null,undefined,false,mx);
+  if(coverageOf(c).gapH>0&&!ids.includes("in")){ids.push("in");c=planClone(st,ids);bestFitMask(c,false,null,undefined,false,mx)}
+  return c;
+}
+const winSig=st=>JSON.stringify(st.locations.map(l=>[l.id,(l.win||[]).map(w=>[w.m,+(+w.s).toFixed(2),+(+w.e).toFixed(2)])]));
+function scoreLayout(st){
+  const cov=coverageOf(st);
+  return {gap:cov.gapH,gaps:cov.gaps,overlap:cov.overlapH,onc:cov.onCallH,off:offDayHours(st),night:limitWarnings(st).length,india:indiaShare(st),fte:baseTeamOf(st).risked};
+}
+function layoutCandidates(st){
+  const strat=st.coverStrategy==="local"?"local":"cost";
+  const plan=strat==="local"?localPlan(st):costPlan(st);
+  const ids=plan.locations.map(l=>l.id);
+  const rows=[];
+  const add=(label,cl,note)=>{const sg=winSig(cl);if(rows.some(r=>r.sig===sg))return;rows.push({label,st:cl,sig:sg,m:scoreLayout(cl),note:note||""})};
+  add(strat==="local"?"Local coverage plan":"Cost optimized plan",plan,strat==="local"?"Each geography is served by a delivery location in or near it.":"India works every hour it may; other locations only close what is left.");
+  const fs=planClone(st,ids);bestFitMask(fs,false,null,undefined,false,capHoursOf(st));add("Same locations, follow the sun",fs,"Each half hour goes to the location nearest its own daytime.");
+  if(st.support==="passive"){const oc=planClone(st,ids);bestFitMask(oc,true,null,undefined,false,capHoursOf(st));oc.support="passive";add("Same locations, P1 on call outside the limits",oc,"Hours nobody may work are on call for P1. They are not shifts.")}
+  const cur=clone(st);cur.shiftLimits=forcedLimits(st);add("Current setup",cur,"Locations and windows as they stand.");
+  rows.forEach((r,i)=>{r.i=i});
+  /* a layout with a night shift never leads; then the fewest uncovered hours, the least overlap, the strategy's own plan, then the most hours in regular hours */
+  rows.sort((a,b)=>(a.m.night>0)-(b.m.night>0)||a.m.gap-b.m.gap||a.m.overlap-b.m.overlap||(a.i>0)-(b.i>0)||a.m.off-b.m.off||a.i-b.i);
+  return {strat,rows};
+}
+let BC_ROWS=[];
+function bestCoverageHtml(st){
+  if(!st.locations||!geosOf(st).length)return "";
+  const cs=layoutCandidates(st), other=layoutCandidates(Object.assign(clone(st),{coverStrategy:cs.strat==="local"?"cost":"local"}));
+  BC_ROWS=cs.rows;
+  const nm=cl=>cl.locations.map(l=>l.name).join(", "), h1=x=>String(+x.toFixed(1)), pct=x=>Math.round(x*100)+"%";
+  const top=cs.rows[0], ok=top&&top.m.night===0;
+  const why=r=>[r.m.gap>0?`${h1(r.m.gap)} h uncovered`:"no uncovered hour",r.m.overlap>0?`${h1(r.m.overlap)} h overlap`:"no overlap",`${h1(r.m.off)} h outside ${clock(REG0)} to ${clock(REG1)} local`].join(", ");
+  const cur=new Set(st.locations.map(l=>l.id));
+  const chg=r=>{const ids=r.st.locations.map(l=>l.id),add=ids.filter(x=>!cur.has(x)).map(x=>LOC_CATALOG.find(c=>c.id===x).name),rm=[...cur].filter(x=>!ids.includes(x)).map(x=>LOC_CATALOG.find(c=>c.id===x)?LOC_CATALOG.find(c=>c.id===x).name:x);return [add.length?"adds "+add.join(", "):"",rm.length?"removes "+rm.join(", "):""].filter(Boolean).join("; ")||"no change to the locations"};
+  const oh=other.rows[0];
+  let h=`<div style="margin:12px 0 0"><b>Best coverage for these locations</b>
+    <div class="row" style="gap:12px;margin:8px 0;align-items:center;flex-wrap:wrap"><div class="seg" role="group" aria-label="Coverage strategy">${[["cost","Cost optimized"],["local","Local coverage"]].map(([k,t])=>`<button type="button" data-strat="${k}" aria-pressed="${cs.strat===k}">${t}</button>`).join("")}</div>${cs.strat==="cost"?`<label class="inline" for="bcIndia" style="margin:0">India share of the hours, up to <input id="bcIndia" type="number" min="0" max="100" step="5" style="width:72px" value="${st.indiaShare==null?"":st.indiaShare}" placeholder="no cap"> %</label>`:""}<label class="inline" for="bcCap" style="margin:0">Longest window per location <input id="bcCap" type="number" min="1" max="24" step="1" style="width:64px" value="${capHoursOf(st)}"> h</label></div>
+    ${cs.strat==="cost"?`<div class="hint" style="margin:0 0 6px">Leave the share empty for as many hours as India may work. Ecuador is the next choice for US hours.</div>`:""}<div class="hint" style="margin-bottom:8px">${cs.strat==="cost"?"India covers most hours. Other locations are added only for hours India cannot work inside the shift limits.":"Each geography is served mainly by a delivery location in or near it, in its own regular hours."} No shift runs outside ${clock(forcedLimits(st).from)} to ${clock(forcedLimits(st).to)} local. Regular hours are ${clock(REG0)} to ${clock(REG1)}. A location works at most ${capHoursOf(st)} hours a day, so a long support window needs more locations, and any hour left over shows as uncovered. Layouts use only the strategy's own locations, so Apply can add or remove delivery locations.</div>
+${cs.rows.map((r,i)=>{const lead=i===0&&ok;return `<div style="border:1px solid ${lead?"var(--accent)":"var(--line)"};border-radius:8px;padding:10px 12px;margin:8px 0;background:${lead?"var(--accent-soft)":"var(--surface-2)"}">
+      <div class="row" style="justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:nowrap"><div style="min-width:0"><b>${esc(r.label)}</b>${lead?` <span class="tag">recommended</span>`:""}<small style="display:block;color:var(--muted)">${esc(nm(r.st))}</small></div><button class="btn sm" type="button" data-applylay="${i}" title="${esc(chg(r))}">Apply</button></div>
+      <div style="display:flex;flex-wrap:wrap;gap:2px 14px;margin:6px 0 2px;font-size:13px"><span><b>${h1(r.m.gap)}</b> h uncovered</span><span><b>${h1(r.m.overlap)}</b> h overlap</span><span><b>${h1(r.m.off)}</b> h outside ${clock(REG0)}–${clock(REG1)}</span><span>India <b>${pct(r.m.india)}</b></span><span><b>${fmt(r.m.fte,2)}</b> FTE</span>${r.m.onc>0?`<span><b>${h1(r.m.onc)}</b> h on call only</span>`:""}</div>
+      <small style="display:block;color:${r.m.night?"var(--risk)":"var(--muted)"}">${esc(r.m.night?"Has a shift outside the limits. ":"")}${esc(i===0&&ok?why(r):r.note)} · ${esc(chg(r))}</small></div>`}).join("")}`;
+  if(top&&top.m.gap>0)h+=`<div class="hint" style="margin-top:6px;color:var(--risk)">The best layout still leaves ${h1(top.m.gap)} uncovered hours. See "Gaps and how to close them" above for other locations to add.</div>`;
+  if(oh)h+=`<div class="hint" style="margin-top:6px">${cs.strat==="cost"?"Local coverage":"Cost optimized"} would use ${esc(nm(oh.st))}: ${fmt(oh.m.fte,2)} FTE, ${h1(oh.m.gap)} h uncovered, India ${pct(oh.m.india)} of the hours. This team is ${fmt(top.m.fte,2)} FTE.</div>`;
+  return h+"</div>";
+}
+function applyLayout(i){
+  const r=BC_ROWS[i];if(!r)return;
+  S.locations=clone(r.st.locations);S.shiftLimits=cleanLimits(r.st.shiftLimits);S.support=r.st.support||S.support;S.meta.winManual=false;
+}
 /* the delivery locations offered for the selected customer regions: each region's list, with every location once */
 function dlocOptions(st){
   const seen=new Set(),out=[];
-  [st.region].concat((st.custExtra||[]).map(e=>e.region)).forEach(k=>{const RG=REGIONS[k];if(RG)RG.del.forEach(([id,tag])=>{if(!seen.has(id)){seen.add(id);out.push([id,tag,RG.name])}})});
+  geosOf(st).map(g=>g.region).forEach(k=>{const RG=REGIONS[k];if(RG)RG.del.forEach(([id,tag])=>{if(!seen.has(id)){seen.add(id);out.push([id,tag,RG.name])}})});
   return out;
 }
 /* when the primary region changes, keep the delivery locations the new set of regions offers; if none are left, take the new primary's defaults */
 function pruneDelivery(){
   const offered=new Set(dlocOptions(S).map(x=>x[0]));
   const keep=S.locations.filter(l=>offered.has(l.id));
-  const RG=REGIONS[S.region];
+  const RG=REGIONS[geosOf(S)[0].region];
   S.locations=keep.length?keep:(RG?RG.def.map(id=>S.locations.find(l=>l.id===id)||pickLoc(id)):S.locations);
 }
 const ordIdx=(ord,id)=>{const i=ord.findIndex(x=>x[0]===id);return i<0?99:i};
-/* a click on a customer region: add it as another customer location, remove it, or, for the primary one, hand the primary role to the next */
-function toggleRegion(k){
+/* a click on a geography: add it with its own local hours (09:00 to 18:00 to start), or remove it. At least one stays. */
+function toggleGeo(k){
   const RG=REGIONS[k];if(!RG)return;
-  S.custExtra=S.custExtra||[];
-  if(k===S.region){
-    if(!S.custExtra.length)return;
-    const e=S.custExtra.shift();
-    S.region=e.region;S.custLoc=e.loc;S.tz=e.utc;S.start=e.s;S.hours=e.h;pruneDelivery();
-  }else if(S.custExtra.some(e=>e.region===k))S.custExtra=S.custExtra.filter(e=>e.region!==k);
-  else if(!S.region)setRegion(k);
-  else if(S.custExtra.length<5)S.custExtra.push({id:uid(),region:k,loc:RG.cust[0][0],utc:RG.cust[0][2],s:9,h:8});   /* a new customer location starts at 09:00 local for 8 hours */
-}
-/* make another customer location the primary one: its clock becomes the model clock, and the old primary becomes an extra */
-function promoteExtra(id){
-  const i=(S.custExtra||[]).findIndex(e=>e.id===id);if(i<0)return;
-  const e=S.custExtra[i];
-  S.custExtra[i]={id:e.id,region:S.region,loc:S.custLoc||"",utc:+S.tz||0,s:hmod(+S.start||0),h:Math.min(24,Math.max(1,Math.round(+S.hours||8)))};
-  S.region=e.region;S.custLoc=e.loc;S.tz=e.utc;S.start=e.s;S.hours=e.h;pruneDelivery();
+  ensureGeos();
+  const i=S.geos.findIndex(g=>g.region===k);
+  if(i>=0){if(S.geos.length>1){S.geos.splice(i,1);pruneDelivery()}}
+  else if(S.geos.length<5)S.geos.push({id:uid(),region:k,loc:RG.cust[0][0],utc:RG.cust[0][2],s:9,h:9});
+  syncGeos(S);
 }
 const relayoutFit=()=>bestFitLayout(S,S.support==="passive");   /* follow the sun: what a region change always did */
-function relayout(){if(S.support==="passive"||(S.custExtra||[]).length||limitsOf(S).on)bestFitLayout(S,S.support==="passive");else autoLayout(S)}
+/* before the customer location changes, several geographies are held in their own list so none of them moves with it */
+function holdGeos(){if(geosOf(S).length>1)ensureGeos()}
+/* a geography that sits at the customer's own place follows the customer's location and time zone; the others keep their own */
+function followCustomer(){
+  if(S.geos&&S.geos.length===1&&S.geos[0].region===S.region){S.geos[0].loc=S.custLoc||"";S.geos[0].utc=+S.tz||0}
+  syncGeos(S);
+}
+function relayout(){if(S.support==="passive"||!simpleGeo(S)||limitsOf(S).on)bestFitLayout(S,S.support==="passive");else autoLayout(S)}
 function updateCustUnion(){
   const el=$("custUnion");if(!el)return;
-  const runs=reqRuns(S), RGp=REGIONS[S.region], pn=RGp?((RGp.cust.find(c=>c[0]===S.custLoc)||[])[1]||RGp.name):"primary";
-  el.innerHTML=`<b>Combined support window:</b> ${runs.length?(runs.length===1&&runs[0][1]===48?"all 24 hours":esc(runs.map(([b,c])=>`${clock(b/2)} to ${clock((b+c)/2)}`).join(" and "))):"none"} on the ${esc(pn)} clock, ${fmt(reqHoursOf(S),1)} hours a day. Where two customer locations are open at once they share one team, so overlap hours are not doubled.`;
+  const runs=reqRuns(S), pn=custName(S);
+  el.innerHTML=`<b>Combined support window:</b> ${runs.length?(runs.length===1&&runs[0][1]===48?"all 24 hours":esc(runs.map(([b,c])=>`${clock(b/2)} to ${clock((b+c)/2)}`).join(" and "))):"none"} on the ${esc(pn)} clock, ${fmt(reqHoursOf(S),1)} hours a day. Where two geographies are open at once they share one team, so overlap hours are not doubled.`;
 }
 
 /* ---------- stage 1 static render ---------- */
@@ -4668,7 +4883,6 @@ function renderS1(){
   $("supportHint").textContent=S.support==="passive"?`Each location is staffed in its own daytime. The hours outside ${LM.on?clock(LM.from)+"–"+clock(LM.to):"07:00–20:00"} local are covered on call for P1 incidents only, and count as the on-call allowance. Change any window below if the customer's ask is different.`:"Every hour of the support window is staffed, in each location's working hours. Nobody is on call only.";
   $("covPresets").innerHTML=COV_PRESETS.map(([k,d,h])=>`<button type="button" data-cov="${k}" aria-pressed="${S.days===d&&S.hours===h}">${k}</button>`).join("");
   $("days").value=String(S.days);
-  $("hours").value=S.hours;
   $("fteHours").value=S.fteHours;
   $("util1").value=S.util1;
   $("outL2").textContent=S.perShift.L2;
@@ -4685,17 +4899,23 @@ function renderS1(){
   const avail=LOC_CATALOG.filter(c=>!S.locations.some(l=>l.id===c.id));
   $("locAdd").innerHTML=avail.map(c=>`<option value="${c.id}">${esc(c.name)} · ${esc(c.kind)}</option>`).join("");
   $("locAdd").disabled=$("locAddBtn").disabled=!avail.length;
-  $("winStart").value=clock(S.start);$("custTz").value=S.tz;
-  const RG=REGIONS[S.region];
-  const exs=S.custExtra||[], selR=[S.region].concat(exs.map(e=>e.region)).filter(k=>REGIONS[k]);
-  $("regionSeg").innerHTML=Object.entries(REGIONS).map(([k,r])=>`<button type="button" data-region="${k}" aria-pressed="${selR.includes(k)}">${r.name}${k===S.region&&exs.length?" · primary":""}</button>`).join("");
+  $("custTz").value=S.tz;
+  const RG=REGIONS[S.region], gs=geosOf(S), selR=gs.map(g=>g.region).filter(k=>REGIONS[k]);
+  $("custRegion").innerHTML=(RG?"":`<option value="">Choose a region</option>`)+Object.entries(REGIONS).map(([k,r])=>`<option value="${k}" ${S.region===k?"selected":""}>${esc(r.name)}</option>`).join("");
+  $("regionSeg").innerHTML=Object.entries(REGIONS).map(([k,r])=>`<button type="button" data-region="${k}" aria-pressed="${selR.includes(k)}">${r.name}</button>`).join("");
   $("custLoc").innerHTML=RG?RG.cust.map(([id,n,u])=>`<option value="${id}" ${S.custLoc===id?"selected":""}>${esc(n)} · ${utcLabel(u)}</option>`).join("")+`<option value="" ${S.custLoc?"":"selected"}>Other (set the time zone)</option>`:`<option value="">Choose a region first</option>`;
   $("custLoc").disabled=!RG;
-  $("regionHint").textContent=selR.length>1?`${selR.map(k=>REGIONS[k].name).join(", ")}. The first is the primary and sets the clock for the window. Click a selected region to remove it. The delivery locations below are offered for all of them.`:RG?`${RG.name} deal. Click more regions to cover several customers in one model. Choosing a region offers its delivery locations below. The customer time zone sets the clock for the support window and the timeline.`:"Choose the region first: it decides which delivery locations are offered.";
-  $("custExtra").innerHTML=exs.length?`<div class="loc-table" style="margin-top:8px"><table><thead><tr><th>Other customer location</th><th class="r">UTC</th><th class="r">Starts (local)</th><th class="r">Hours a day</th></tr></thead><tbody>${exs.map(e=>{const RGe=REGIONS[e.region];return `<tr data-cxrow="${esc(e.id)}"><td><b>${esc(RGe.name)}</b><br><select data-cxloc="1" aria-label="${esc(RGe.name)} customer location">${RGe.cust.map(([id,n,u])=>`<option value="${id}" ${e.loc===id?"selected":""}>${esc(n)} · ${utcLabel(u)}</option>`).join("")}</select><div class="row" style="gap:6px;margin-top:6px"><button class="btn ghost sm" type="button" data-cxpro="${esc(e.id)}">Make primary</button><button class="btn ghost sm" type="button" data-cxrm="${esc(e.id)}">Remove</button></div></td><td class="r">${utcLabel(+e.utc||0)}</td><td class="r"><input type="time" step="900" data-cxs="1" value="${clock(e.s)}" aria-label="${esc(RGe.name)} support starts, local time"></td><td class="r"><input type="number" class="w-s" min="1" max="24" step="1" data-cxh="1" value="${e.h}" aria-label="${esc(RGe.name)} support hours a day"></td></tr>`}).join("")}</tbody></table></div><div class="hint" id="custUnion" style="margin-top:6px"></div>`:"";
-  const dopts=dlocOptions(S), imeOnly=selR.length===1&&RG&&RG.name.startsWith("India and Middle East");
+  $("regionHint").textContent=RG?`Where the customer is. It sets the clock for the strip, the timeline and the reports. It does not by itself ask for coverage: the geographies below do.`:"Choose where the customer is.";
+  $("geoHint").textContent=selR.length>1?`${selR.map(k=>REGIONS[k].name).join(", ")}. Click a selected geography to remove it. Delivery locations below are offered for all of them.`:`Click more geographies to cover them in one model, even when the customer is in one place. Each starts at 09:00 local for 9 hours. Delivery locations below are offered for the geographies chosen.`;
+  $("custExtra").innerHTML=`<div style="margin-top:8px">${gs.map(e=>{const RGe=REGIONS[e.region]||{name:"Geography",cust:[]};return `<div data-cxrow="${esc(e.id)}" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0;background:var(--surface-2)">
+    <div class="row" style="justify-content:space-between;gap:8px;align-items:center"><span><b>${esc(RGe.name)}</b> <small style="color:var(--muted)">${utcLabel(+e.utc||0)}</small></span>${gs.length>1?`<button class="btn ghost sm" type="button" data-cxrm="${esc(e.id)}">Remove</button>`:""}</div>
+    <div class="row" style="gap:6px 12px;flex-wrap:wrap;margin-top:6px">
+      <label class="inline">Location <select data-cxloc="1" aria-label="${esc(RGe.name)} location">${RGe.cust.map(([id,n,u])=>`<option value="${id}" ${e.loc===id?"selected":""}>${esc(n)} · ${utcLabel(u)}</option>`).join("")}</select></label>
+      <label class="inline">Starts (local) <input type="time" step="900" data-cxs="1" value="${clock(e.s)}" aria-label="${esc(RGe.name)} support starts, local time"></label>
+      <label class="inline">Hours a day <input type="number" class="w-s" min="1" max="24" step="1" data-cxh="1" value="${e.h}" aria-label="${esc(RGe.name)} support hours a day"></label></div></div>`}).join("")}</div><div class="hint" id="custUnion" style="margin-top:6px"></div>`;
+  const dopts=dlocOptions(S), imeOnly=selR.length===1&&REGIONS[selR[0]]&&REGIONS[selR[0]].name.startsWith("India and Middle East");
   $("dlocChips").innerHTML=dopts.map(([id,tag])=>{const c=LOC_CATALOG.find(x=>x.id===id);return `<button type="button" data-dloc="${id}" aria-pressed="${S.locations.some(l=>l.id===id)}">${esc(c.name)}<small style="display:block;font-weight:400">${esc(imeOnly?"India only":tag)} · ${utcLabel(c.utc)}</small></button>`}).join("");
-  $("dlocHint").textContent=dopts.length?(dopts.length>1?`${selR.length>1?`Options for ${selR.length} customer regions. `:""}Tick every location that will deliver from this list. Changing the selection re-lays out the working windows to follow the sun, unless you have edited them by hand. Then a new location only gets windows for the uncovered hours and the others stay as they are.`:"India is the only delivery location for IME deals."):"Choose where the opportunity is from to see the delivery locations for that region.";
+  $("dlocHint").textContent=dopts.length?(dopts.length>1?`${selR.length>1?`Options for ${selR.length} geographies. `:""}Tick every location that will deliver from this list. Changing the selection re-lays out the working windows to follow the sun, unless you have edited them by hand. Then a new location only gets windows for the uncovered hours and the others stay as they are.`:"India is the only delivery location for IME deals."):"Choose a geography to cover to see the delivery locations for it.";
   $("winEditor").innerHTML=S.locations.map(l=>`<div class="wloc" data-wloc="${l.id}">
     <div class="whead"><span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${locColor(l.id)};margin-right:6px"></i><b>${esc(l.name)}</b><small>${utcLabel(+l.utc||0)}</small></span><span class="row" style="gap:6px">${WIN_PRESETS.map(([n,t],i)=>`<button type="button" class="btn sm" data-wpre="${l.id}:${i}" title="Add a ${t} local window">${n} ${t}</button>`).join("")}<button type="button" class="btn sm" data-addwin="${l.id}">Add window</button></span></div>
     ${(l.win||[]).map(w=>`<div class="wrow" data-win="${w.id}"><div class="seg" role="group" aria-label="Window type">${[["active","Active"],["oncall","On-call (P1)"]].map(([k,t])=>`<button type="button" data-wm="${w.id}:${k}" aria-pressed="${(w.m==="oncall"?"oncall":"active")===k}">${t}</button>`).join("")}</div>
@@ -5038,7 +5258,7 @@ function update(){
 }
 /* A compact version of the coverage timeline for the inputs panel: one 48-cell bar per row, on the customer clock from the window start. */
 function miniHtml(C){
-  const st=Math.round(tlStart()*2)%48, many=(S.custExtra||[]).length>0;
+  const st=Math.round(tlStart()*2)%48, many=!simpleGeo(S);
   const bar=fn=>{let o="";for(let j=0;j<48;j++)o+=`<i class="${fn((st+j)%48)}"></i>`;return `<div class="tm-b">${o}</div>`};
   const row=(label,dot,body)=>`<div class="tm-r"><div class="tm-l" title="${esc(label)}">${dot?`<span class="tm-d" style="background:${dot}"></span>`:""}${esc(label)}</div>${body}</div>`;
   let ticks="";for(let j=0;j<24;j+=3)ticks+=`<span>${clock(tlStart()+j)}</span>`;
@@ -5058,7 +5278,7 @@ window.addEventListener("resize",setNavH);
 {const n_=document.querySelector(".stages");if(n_&&window.ResizeObserver)new ResizeObserver(setNavH).observe(n_)}
 function renderTimeline(){
   renderMini();
-  const C=R.cover, st=tlStart(), cols=[...Array(24)].map((_,j)=>hmod(st+j)), many=(S.custExtra||[]).length>0;
+  const C=R.cover, st=tlStart(), cols=[...Array(24)].map((_,j)=>hmod(st+j)), many=!simpleGeo(S);
   const bin=(arr,h)=>[arr[Math.floor(h)*2],arr[Math.floor(h)*2+1]];
   const head=`<tr><th class="rowh">Customer time<br><small>${utcLabel(+S.tz||0)}</small></th>${cols.map(h=>`<th>${clock(h)}</th>`).join("")}<th>Active h/day</th><th>On-call h/day</th></tr>`;
   const geoRows=many?custList(S).map(c=>`<tr><td class="rowh">${esc(c.name)}<small>${clock(c.s)} to ${clock(c.s+c.h)} local</small></td>${cols.map(h=>{const r=bin(c.mask,h);return `<td class="c ${r[0]&&r[1]?"req":""}">${r[0]||r[1]?"●":""}</td>`}).join("")}<td class="num">${fmt(c.h,1)}</td><td class="num"></td></tr>`).join(""):"";
@@ -5118,11 +5338,11 @@ function updateS1(){
   $("fwCheck").textContent=(R.oncH>0||R.cover.overlapH>0||R.cover.outsideH>0||R.cover.gapH>0)?`Framework check: the support window alone gives (hours × people) ÷ contracted hours = ${fmt(R.framework,2)} FTE. Windows, on-call time and overlap bring the roster to ${fmt(R.roster,2)} (${sgn(R.roster-R.framework,2)}).`:`✓ Framework check: (hours × people) ÷ contracted hours = ${fmt(R.framework,2)} FTE, the same as the roster line. The framework's p.3 example (24×5, 2 per shift) gives 6.`;
   updateRiskDeltas("s1",R.buffered,R.risk1Add,R.rp1);
   renderAuto("s1",[
-    ["A1",`Coverage is ${covLabel()}: ${(S.custExtra||[]).length?`${h1s(reqHoursOf(S))} hours a day, the combined hours of ${custText(S)},`:`${S.hours} hours a day from ${clock(S.start)} customer time,`} ${S.days} days a week, worked in ${R.blocks.length} location window${R.blocks.length===1?"":"s"}. Each window is staffed for its full length, and overlap between locations is staffed twice.${R.oncH>0?` ${fmt(R.actH,0)} hours a week are active and ${fmt(R.oncH,0)} are on-call for P1 incidents only, counted at ${fmt(R.oc1*100,1)}% of staffed time${S.ocMode==="p1"?` (${S.standby}% standby plus ${fmt(R.p1Busy*100,1)}% busy on ${fmt(+S.p1PerMonth||0,1)} P1s a month at ${S.p1Hours}h each)`:""}.`:" All windows are actively staffed."}`,"[F] 1.1 C"],
+    ["A1",`Coverage is ${covLabel()}: ${!simpleGeo(S)?`${h1s(reqHoursOf(S))} hours a day, the combined hours of ${custText(S)},`:`${S.hours} hours a day from ${clock(S.start)} customer time,`} ${S.days} days a week, worked in ${R.blocks.length} location window${R.blocks.length===1?"":"s"}. Each window is staffed for its full length, and overlap between locations is staffed twice.${R.oncH>0?` ${fmt(R.actH,0)} hours a week are active and ${fmt(R.oncH,0)} are on-call for P1 incidents only, counted at ${fmt(R.oc1*100,1)}% of staffed time${S.ocMode==="p1"?` (${S.standby}% standby plus ${fmt(R.p1Busy*100,1)}% busy on ${fmt(+S.p1PerMonth||0,1)} P1s a month at ${S.p1Hours}h each)`:""}.`:" All windows are actively staffed."}`,"[F] 1.1 C"],
     ["A2",`Each FTE works ${S.fteHours} contracted hours a week.`,"[F] p.3 b"],
     ["A3",`Each resource is productive ${S.util1}% of contracted hours (training, meetings, admin), so the roster is divided by ${S.util1}%. Leave and holidays are handled separately.`,"[F] G6"],
     ["A4",`At least ${S.perShift.L2} L2 and ${S.perShift.L3} L3 on duty in every staffed hour, whatever the ticket volume. Ticket-driven effort is sized separately from Step 2 and compared with this team.`,"[F] p.3 c"],
-    ["A5",`Windows are worked from ${R.locs.filter(l=>l.slots).map(l=>`${l.name} (${l.slots})`).join(", ")||"no location yet"}, each in its own time zone (${R.locs.filter(l=>l.slots).map(l=>`${l.name} ${utcLabel(+l.utc||0)}`).join(", ")}) against a customer clock of ${utcLabel(+S.tz||0)}.${(S.custExtra||[]).length?" The combined window is the union of the customer locations' own hours, shown on the first customer location's clock. Where two are open together they share one team, so overlap hours are not doubled.":""}${limitsText(S)?` Shift limits: ${limitsText(S)}.`:""} Each location keeps its own roster.`,"[F] G3"],
+    ["A5",`Windows are worked from ${R.locs.filter(l=>l.slots).map(l=>`${l.name} (${l.slots})`).join(", ")||"no location yet"}, each in its own time zone (${R.locs.filter(l=>l.slots).map(l=>`${l.name} ${utcLabel(+l.utc||0)}`).join(", ")}) against a customer clock of ${utcLabel(+S.tz||0)}.${!simpleGeo(S)?` The combined window is the union of the geographies' own hours, shown on the ${custName(S)} clock. Where two are open together they share one team, so overlap hours are not doubled.`:""}${limitsText(S)?` Shift limits: ${limitsText(S)}.`:""} Each location keeps its own roster.`,"[F] G3"],
     ["A6",S.backfill?`Leave and public holidays are backfilled on a ${WORK_DAYS}-day working year per location.`:"No backfill for leave or public holidays. The client accepts reduced cover on those days.","proposed"],
     ["A7","The tool sizes FTE only. Rates, cost and price are out of scope.","agreed"]
   ]);
@@ -5853,7 +6073,7 @@ function buildCustomerReport(){
   const n1=x=>fmt(x,1);
   /* coverage in plain words */
   const shiftTxt=R.blocks.map(k=>{const loc=S.locations.find(l=>l.id===k.loc)||{};const cs=`${clock(toCust(S,loc,k.s))}–${clock(toCust(S,loc,k.e))}`;
-    return `<li><b>${esc(loc.name||"")}</b>, ${cs} ${(S.custExtra||[]).length?`on the ${esc(custList(S)[0].name)} clock`:"your time"} (${hrs(k.h)} hours): ${k.mode==="oncall"?"<b>on call</b> for critical (P1) incidents: an engineer is reachable and responds, but no one is working the window":"engineers <b>working</b> the window"}.</li>`}).join("");
+    return `<li><b>${esc(loc.name||"")}</b>, ${cs} ${!simpleGeo(S)?`on the ${esc(custName(S))} clock`:"your time"} (${hrs(k.h)} hours): ${k.mode==="oncall"?"<b>on call</b> for critical (P1) incidents: an engineer is reachable and responds, but no one is working the window":"engineers <b>working</b> the window"}.</li>`}).join("");
   const wk=S.days>5?(S.weekendMode==="oncall"?"Weekends are covered on call for critical (P1) incidents.":"Weekends are covered the same way as weekdays."):"No weekend cover.";
   /* scope */
   const scope=R.towers.filter(t=>t.src!=="Not answered yet").map(t=>{
@@ -5910,7 +6130,7 @@ function buildCustomerReport(){
     <div class="kpi"><span>${T>1?`Year ${T} team`:"Contract"}</span><b>${T>1?n1(yrs[T-1].fte):"1 yr"}</b><em>${T>1?`FTE, ${fmt(drop,0)}% below Year 1 through automation`:"term"}</em></div>
   </div>
   <h2>How you are covered</h2>
-  <p>Support runs ${h1s(reqHoursOf(S))} hours a day, ${S.days} days a week, across ${R.blocks.length} location window${R.blocks.length===1?"":"s"}:</p>${(S.custExtra||[]).length?`<p>It covers ${custList(S).length} customer locations, each with its own hours: ${esc(custText(S))}. The times below are on the ${esc(custList(S)[0].name)} clock.</p>`:""}${limitsText(S)?`<p>Delivery: ${esc(limitsText(S))}.</p>`:""}<ul>${shiftTxt}</ul><p>${wk}</p>
+  <p>Support runs ${h1s(reqHoursOf(S))} hours a day, ${S.days} days a week, across ${R.blocks.length} location window${R.blocks.length===1?"":"s"}:</p>${!simpleGeo(S)?`<p>It covers ${custList(S).length} geographies, each with its own hours: ${esc(custText(S))}. The times below are on the ${esc(custName(S))} clock.</p>`:""}${limitsText(S)?`<p>Delivery: ${esc(limitsText(S))}.</p>`:""}<ul>${shiftTxt}</ul><p>${wk}</p>
   ${scope?`<h2>What is in scope</h2><table><thead><tr><th>Service</th><th>How it was sized</th><th>Support levels and SLA</th><th>AIOps</th></tr></thead><tbody>${scope}</tbody></table>
   ${R.aiTowers.length?`<p class="muted">Where AIOps is included, dedicated AI engineers build intelligent alerting, automated root-cause analysis and self-healing, so fewer incidents need a person to resolve them.</p>`:""}`:""}
   <h2>The team in Year 1</h2>
@@ -6010,7 +6230,7 @@ function buildReport(){
   <h3>Assumptions register</h3>${registerGroups().map(g=>`<div class="muted" style="margin:10px 0 2px"><b>${esc(g.cat)}</b></div><ul class="assume">${g.items.map(i=>`<li><b>Step ${i.step}</b> ${esc(i.t)} <span class="src">${esc(i.src)}</span></li>`).join("")}</ul>`).join("")}
   ${(R.scnCols||[]).length>1?`<h3>Scenarios compared</h3>${tableOf("scnCmp")}`:""}
   <h3>Verify against the framework</h3><p>${(()=>{const t=R.tests||runSelfTests();return `${t.filter(x=>x.pass).length} of ${t.length} self-checks pass.${t.some(x=>!x.pass)?" Failing: "+esc(t.filter(x=>!x.pass).map(x=>x.name).join("; "))+".":""}`})()}</p>
-  <p class="muted">Coverage ${esc(covLabel())}${(S.custExtra||[]).length?` (${esc(custText(S))})`:""}${limitsText(S)?` · ${esc(limitsText(S))}`:""} · ${R.blocks.length} location windows · utilisation ${S.util1}% · leave backfill ${S.backfill?"on":"off"} · complexity ${esc(R.CX.name)} · term ${T} year${T>1?"s":""}${exTot>0?` · existing team ${fmt(exTot,1)} FTE (${sgn((R.total-exTot)/exTot*100,0)}%)`:""}</p>
+  <p class="muted">Coverage ${esc(covLabel())}${!simpleGeo(S)?` (${esc(custText(S))})`:""}${limitsText(S)?` · ${esc(limitsText(S))}`:""} · ${R.blocks.length} location windows · utilisation ${S.util1}% · leave backfill ${S.backfill?"on":"off"} · complexity ${esc(R.CX.name)} · term ${T} year${T>1?"s":""}${exTot>0?` · existing team ${fmt(exTot,1)} FTE (${sgn((R.total-exTot)/exTot*100,0)}%)`:""}</p>
   ${stageDoc(1,"Base team from coverage",tableOf("locCalc"))}
   ${stageDoc(2,"Service towers",tableOf("towerCalc")+tableOf("skillCalc"))}
   ${stageDoc(9,"Current team: ticket volume, base team and the existing team as a reference range",tableOf("triTable")+`<div class="verdict">${$("triVerdict").innerHTML}</div>`)}
@@ -6146,7 +6366,8 @@ document.addEventListener("click",e=>{
   else if(t.id==="xAll"||t.id==="xNone"){document.querySelectorAll("[data-xkey]").forEach(c=>c.checked=t.id==="xAll");}
   else if(d.go){go(+d.go)}
   else if(d.support){S.support=d.support;bestFitLayout(S,d.support==="passive");renderS1();update();}
-  else if(d.cov){const p=COV_PRESETS.find(x=>x[0]===d.cov);S.days=p[1];S.hours=p[2];S.start=p[2]>=24?0:9;(S.custExtra||[]).forEach(e=>{e.h=Math.min(24,p[2]);if(p[2]>=24)e.s=0});   /* hours a day follow the preset; each start the user set is kept */relayout();renderS1();update();}
+  else if(d.cov){const p=COV_PRESETS.find(x=>x[0]===d.cov);S.days=p[1];ensureGeos();S.geos.forEach(g=>{const was=g.h;g.h=Math.min(24,p[2]);if(p[2]>=24)g.s=0;else if(was>=24)g.s=9});syncGeos(S);   /* hours a day follow the preset for every geography; a start the user set is kept */
+    relayout();renderS1();update();}
   else if(d.wm){S.meta.winManual=true;const [id,m]=pair(d.wm);S.locations.forEach(l=>(l.win||[]).forEach(w=>{if(w.id===id)w.m=m}));renderS1();update();}
   else if(d.addwin){S.meta.winManual=true;const l=S.locations.find(x=>x.id===d.addwin);if(l){const s=toLocal(S,l,+S.start||0);l.win.push({id:uid(),m:"active",s,e:s+Math.min(8,Math.max(1,+S.hours||8))});renderS1();update();}}
   else if(d.rmwin){S.meta.winManual=true;S.locations.forEach(l=>{l.win=(l.win||[]).filter(w=>w.id!==d.rmwin)});renderS1();update();}
@@ -6154,9 +6375,10 @@ document.addEventListener("click",e=>{
   else if(d.winfit){S.support=d.winfit==="night"?"passive":"active";bestFitLayout(S,d.winfit==="night");renderS1();update();}
   else if(d.wpre){S.meta.winManual=true;const [lid,i]=d.wpre.split(":"),l=S.locations.find(x=>x.id===lid),pr=WIN_PRESETS[+i];if(l&&pr){l.win=l.win||[];l.win.push({id:uid(),m:"active",s:pr[2],e:pr[3]});renderS1();update();}}
   else if(d.addsug){addDeliveryLocation(d.addsug);renderS1();update();}
-  else if(d.cxrm){S.custExtra=(S.custExtra||[]).filter(e=>e.id!==d.cxrm);relayoutFit();renderS1();update();}
-  else if(d.cxpro){promoteExtra(d.cxpro);relayoutFit();renderS1();update();}
-  else if(d.region){toggleRegion(d.region);relayoutFit();renderS1();update();}
+  else if(d.strat){S.coverStrategy=d.strat==='local'?'local':'cost';renderS1();update();}
+  else if(d.applylay!=null){applyLayout(+d.applylay);renderS1();update();}
+  else if(d.cxrm){ensureGeos();if(S.geos.length>1){S.geos=S.geos.filter(e=>e.id!==d.cxrm);pruneDelivery();syncGeos(S)}relayoutFit();renderS1();update();}
+  else if(d.region){toggleGeo(d.region);relayoutFit();renderS1();update();}
   else if(d.dloc){if(!changeDelivery(d.dloc,!S.locations.some(l=>l.id===d.dloc)))return;renderS1();update();}
   else if(d.wmode){S.weekendMode=d.wmode;renderS1();update();}
   else if(d.step){const [k,dv]=d.step.split(":");S.perShift[k]=Math.max(0,Math.min(9,S.perShift[k]+(+dv)));$("out"+k).textContent=S.perShift[k];update();}
@@ -6231,15 +6453,20 @@ document.addEventListener("input",e=>{
   if(t.id==="dealName"){S.deal=t.value;updateMeta();save();return}
   if(t.id==="mPrep"){S.meta.preparedBy=t.value;save();return}
   if(t.id==="mAppr"){S.meta.approvedBy=t.value;updateMeta();save();return}
-  if(d.cxs!=null||d.cxh!=null){const row=t.closest("[data-cxrow]"),e=row&&(S.custExtra||[]).find(x=>x.id===row.dataset.cxrow);
-    if(e){if(d.cxs!=null){if(/^\d\d:\d\d$/.test(t.value)){const [h,m]=t.value.split(":").map(Number);e.s=h+m/60;update()}}else{const v=Math.round(+t.value);if(t.value!==""&&v>=1&&v<=24){e.h=v;update()}}}
+  if(d.cxs!=null||d.cxh!=null){const row=t.closest("[data-cxrow]");
+    if(row){ensureGeos();const e=S.geos.find(x=>x.id===row.dataset.cxrow);
+      if(e){if(d.cxs!=null){if(/^\d\d:\d\d$/.test(t.value)){const [h,m]=t.value.split(":").map(Number);e.s=h+m/60;syncGeos(S);update()}}else{const v=Math.round(+t.value);if(t.value!==""&&v>=1&&v<=24){e.h=v;syncGeos(S);update()}}}}
     return}
-  if(t.id==="winStart"){if(/^\d\d:\d\d$/.test(t.value)){const [h,m]=t.value.split(":").map(Number);S.start=h+m/60;update()}return}
-  if(t.id==="custLoc"){const RGc=REGIONS[S.region],c=RGc&&RGc.cust.find(x=>x[0]===t.value);S.custLoc=t.value||null;if(c){S.tz=c[2]}renderS1();update();return}
-  if(t.id==="custTz"){const v=+t.value;if(t.value!==""&&v>=-12&&v<=14){S.tz=v;update()}return}
+  if(t.id==="custRegion"){const RG=REGIONS[t.value];if(!RG)return;holdGeos();
+    const own=!Array.isArray(S.geos)||!S.geos.length||(S.geos.length===1&&S.geos[0].region===S.region);   /* a single geography at the customer's own place follows the customer, as before */
+    S.region=t.value;S.custLoc=RG.cust[0][0];S.tz=RG.cust[0][2];
+    if(own){if(S.geos&&S.geos.length)S.geos[0]=Object.assign({},S.geos[0],{region:t.value,loc:S.custLoc,utc:S.tz});syncGeos(S);S.locations=RG.def.map(id=>S.locations.find(l=>l.id===id)||pickLoc(id));bestFitLayout(S,S.support==="passive")}
+    else syncGeos(S);
+    renderS1();update();return}
+  if(t.id==="custLoc"){holdGeos();const RGc=REGIONS[S.region],c=RGc&&RGc.cust.find(x=>x[0]===t.value);S.custLoc=t.value||null;if(c){S.tz=c[2]}followCustomer();renderS1();update();return}
+  if(t.id==="custTz"){const v=+t.value;if(t.value!==""&&v>=-12&&v<=14){holdGeos();S.tz=v;followCustomer();update()}return}
   if(d.lutc){const v=+t.value;if(t.value!==""&&v>=-12&&v<=14){S.locations.find(x=>x.id===t.closest("tr").dataset.loc).utc=v;update()}return}
   if(d.wt){if(/^\d\d:\d\d$/.test(t.value)){S.meta.winManual=true;const [h,m]=t.value.split(":").map(Number), id=t.closest("[data-win]").dataset.win;S.locations.forEach(l=>(l.win||[]).forEach(w=>{if(w.id!==id)return;const v=h+m/60,pr=d.wt==="s"?normWin(v,w.e):normWin(w.s,v);w.s=pr[0];w.e=pr[1]}));update()}return}
-  if(t.id==="hours"){const v=Math.round(+t.value);if(v>=1&&v<=24){S.hours=v;update();}return}
   if(t.id==="util1"){const v=+t.value;if(t.value!==""&&v>=50&&v<=100){S.util1=v;update()}return}
   if(t.id==="oncall1"){const v=+t.value;if(t.value!==""&&v>=0&&v<=100){S.oncall1=v;update()}return}
   if(t.id==="p1PerMonth"){S.p1PerMonth=t.value===""?null:Math.max(0,+t.value);update();return}
@@ -6288,6 +6515,8 @@ document.addEventListener("change",e=>{
   if(d.clink){const [cid,tid]=d.clink.split("|"), tw=S.towers.find(x=>x.id===tid);
     if(tw&&(S.clauses||[]).some(c=>c.id===cid)){tw.clauseIds=tw.clauseIds||[];const i=tw.clauseIds.indexOf(cid);if(t.checked&&i<0)tw.clauseIds.push(cid);else if(!t.checked&&i>=0)tw.clauseIds.splice(i,1)}
     update();return}
+  if(t.id==="bcCap"){const v=Math.round(+t.value);S.coverCap=(t.value!==""&&v>=1&&v<=24)?v:9;renderS1();update();return}
+  if(t.id==="bcIndia"){S.indiaShare=(t.value===""||!isFinite(+t.value))?null:Math.min(100,Math.max(0,Math.round(+t.value)));renderS1();update();return}
   if(t.id==="cpOn"){S.adj.on=t.checked;update();return}
   if(t.id==="cpReason"){S.adj.reason=t.value;update();return}
   if(t.id==="cmBase"){S.cm.baseline=t.value;update();return}
@@ -6311,10 +6540,10 @@ document.addEventListener("change",e=>{
     const L0=limitsOf(S), tm=v=>/^\d\d:\d\d$/.test(v)?(+v.slice(0,2))+(+v.slice(3))/60:null;
     S.shiftLimits={on:t.id==="limOn"?t.checked:L0.on,from:t.id==="limFrom"&&tm(t.value)!=null?tm(t.value):L0.from,to:t.id==="limTo"&&tm(t.value)!=null?(t.value==="00:00"?24:tm(t.value)):L0.to};
     S.shiftLimits=cleanLimits(S.shiftLimits);relayoutFit();renderS1();update();return}
-  if(d.cxloc!=null){const row=t.closest("[data-cxrow]"),e=row&&(S.custExtra||[]).find(x=>x.id===row.dataset.cxrow),c=e&&REGIONS[e.region].cust.find(x=>x[0]===t.value);
-    if(e&&c){e.loc=c[0];e.utc=c[2];relayoutFit();renderS1();update()}return}
+  if(d.cxloc!=null){const row=t.closest("[data-cxrow]");
+    if(row){ensureGeos();const e=S.geos.find(x=>x.id===row.dataset.cxrow),c=e&&REGIONS[e.region].cust.find(x=>x[0]===t.value);
+      if(e&&c){e.loc=c[0];e.utc=c[2];syncGeos(S);relayoutFit();renderS1();update()}}return}
   if(t.id==="days"){S.days=+t.value;renderS1();update();return}
-  if(t.id==="hours"){renderS1();update();return}
   if(t.id==="exSource"){S.exSource=t.value;update();return}
   if(t.id==="protectFloor"){S.protectFloor=t.checked;update();return}
   if(t.id==="backfill"){S.backfill=t.checked;update();return}
@@ -6347,7 +6576,7 @@ function summary(){
   };
   L.push(`# ${S.deal||"DAMO deal"}: estimate workflow`,"",`Version ${S.meta.version} · ${approvalStale()?"changed since approval":STATUS[S.meta.status]}${S.meta.preparedBy?` · prepared by ${S.meta.preparedBy}`:""}${S.meta.status==="approved"&&S.meta.approvedBy?` · approved by ${S.meta.approvedBy}${S.meta.approvedAt?` on ${S.meta.approvedAt}`:""}`:""}`,"",`**Team: ${fmt(R.total,2)} FTE${S.rounding!=="none"?`, rostered as ${fmt(R.people,0)} people`:""}${R.fin.on?` (modelled; a proposed final number is applied in Step 12)`:""}**`);
   L.push("",`## ${PARTS_SHORT[1]} · Step ${STEPNO[1]} · Coverage: base team (${covLabel()}, ${Rr.blocks.length} location windows)`);
-  if((S.custExtra||[]).length)L.push(`- Customer locations (own local hours, combined on the ${custList(S)[0].name} clock): ${custText(S)}`);
+  if(!simpleGeo(S))L.push(`- Geographies covered (own local hours, combined on the ${custName(S)} clock): ${custText(S)}`);
   if(limitsText(S))L.push(`- Shift limits: ${limitsText(S)}`);
   L.push(`- a  Window hours to cover per week: ${fmt(reqHoursOf(S),1).replace(/\.0$/,"")} × ${S.days} = ${fmt(Rr.reqH,0)}`);
   L.push(`- a′ Staffed hours per week: ${fmt(Rr.actH,1)} active${Rr.oncH>0?` + ${fmt(Rr.oncH,1)} on-call × ${fmt(Rr.oc1*100,1)}%`:""} = ${fmt(Rr.aEff,1)}`);
@@ -6741,13 +6970,12 @@ function applyProposals(){
     const c=j.coverage;
     if(c.daysPerWeek)S.days=c.daysPerWeek;
     const geo=(c.regions||[]).filter(g=>REGIONS[g.region]);const multi=geo.length>=1;
-    if(!multi&&c.hoursPerDay)S.custExtra=[];   /* one stated window replaces any other customer locations */
-    if(c.hoursPerDay&&!multi){S.hours=c.hoursPerDay;S.start=S.hours>=24?0:9}
+    if(!multi&&c.hoursPerDay){delete S.geos;S.custExtra=[];S.hours=c.hoursPerDay;S.start=S.hours>=24?0:9}   /* one stated window is the customer's own, and replaces any other geographies */
     if(multi){
-      /* each geography keeps its own local hours; the first is the primary and sets the model clock */
-      const mk=g=>({region:g.region,loc:REGIONS[g.region].cust[0][0],utc:REGIONS[g.region].cust[0][2],s:hmod(g.startLocal),h:g.hoursPerDay});
-      const f=mk(geo[0]);if(S.region!==f.region)S.custLoc=f.loc;S.region=f.region;if(S.region===f.region&&S.custLoc){const cc=REGIONS[f.region].cust.find(x=>x[0]===S.custLoc);if(cc)f.utc=cc[2]}S.tz=f.utc;S.start=f.s;S.hours=f.h;
-      S.custExtra=geo.slice(1,6).map(g=>({id:uid(),...mk(g)}));pruneDelivery();
+      /* each geography keeps its own local hours; the customer's location (the clock) is not changed */
+      S.geos=geo.slice(0,5).map((g,i)=>({id:i===0?"g0":uid(),region:g.region,loc:REGIONS[g.region].cust[0][0],utc:REGIONS[g.region].cust[0][2],s:hmod(g.startLocal),h:g.hoursPerDay}));S.custExtra=[];
+      if(!REGIONS[S.region]){const R0=REGIONS[geo[0].region];S.region=geo[0].region;S.custLoc=R0.cust[0][0];S.tz=R0.cust[0][2]}
+      syncGeos(S);pruneDelivery();
     }
     if(c.hoursPerDay||c.outOfHours||multi){S.support=c.outOfHours==="oncall"?"passive":"active";if(multi)relayout();else autoLayout(S,Array.from({length:12},(_,i)=>i===0||!c.outOfHours?"active":c.outOfHours))}
     if(c.weekends==="oncall")S.weekendMode="oncall";else if(c.weekends==="active")S.weekendMode="active";
