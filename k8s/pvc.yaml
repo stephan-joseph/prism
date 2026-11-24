@@ -1,12 +1,12 @@
-# Holds the accounts, the audit log and the usage history, so they survive a restart or a new image.
-# Needs a working storage class on the cluster (check: kubectl get storageclass). Single replica only.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: prism-data
   namespace: prism-damo
 spec:
-  accessModes: [ReadWriteOnce]
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp2
   resources:
     requests:
-      storage: 1Gi
+      storage: 5Gi     # adjust to the size you actually want

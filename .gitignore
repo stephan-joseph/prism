@@ -4,3 +4,5 @@ node_modules/
 package-lock.json
 _dbg.html
 _shot.html
+prism-backup-*.tgz
+prism-prerestore-*.tgz

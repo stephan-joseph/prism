@@ -109,6 +109,38 @@ Sign-in is on when the server has `SESSION_SECRET`. Without it the site is open 
 - **Risk to know:** the address is plain `http` until a DNS name and certificate exist. Passwords and cookies then cross the network unencrypted. The login page says so. When the load balancer serves HTTPS, the server sees `X-Forwarded-Proto: https` and switches on `Secure` cookies and HSTS by itself. Until then, limit the load balancer to a known address range.
 - **Not covered:** company single sign-on, multi-factor sign-in, self-service password reset.
 
+## Backup, restore and rebuilding from scratch (EKS build)
+
+Accounts, the audit log and the usage history live on the `prism-data` volume. Deleting the cluster, the namespace or the volume claim normally deletes the disk with them. The Secret `prism-secrets` also lives only in the cluster (by design it is not in git). Passwords are stored as hashes, so a lost account file cannot be rebuilt from anything else.
+
+**Back up** (needs a working `kubectl` login):
+
+```bash
+scripts/backup-data.sh                 # writes prism-backup-<time>.tgz here, owner-only
+scripts/backup-data.sh my-backup.tgz   # or a name you choose; it never overwrites a file
+```
+
+The file holds password hashes and the audit log. Keep it like a secret (a password manager's file store, an encrypted disk, a private bucket). `.gitignore` blocks `prism-backup-*.tgz` and `prism-prerestore-*.tgz`. Back up after adding people and on a schedule, for example weekly.
+
+**Restore:**
+
+```bash
+scripts/restore-data.sh prism-backup-<time>.tgz
+```
+
+It shows what is in the file and asks you to type `yes`. It first saves the current data to `prism-prerestore-<time>.tgz` in the folder you ran it from, then unpacks the backup over `/data`. Files with the same name are replaced and nothing is deleted. It refuses an archive that is not a Prism backup. Undo: restore the `prism-prerestore` file. Tested against a real container: after the volume was wiped, a restore brought back the admin's changed password and another person's account.
+
+**Rebuild from scratch** (new cluster or lost volume), in this order:
+
+1. Make sure the cluster has a working storage class (`kubectl get storageclass`) and create the namespace `prism-damo`.
+2. Create the Secret `prism-secrets` from values kept outside the cluster (a password manager or AWS Secrets Manager): `ANTHROPIC_AUTH_TOKEN` or `ANTHROPIC_API_KEY`, `INTAKE_PASSPHRASE` if you still want one, `USAGE_ADMIN_KEY` if used, `SESSION_SECRET` (a new one is fine; it only signs everyone out), `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Keep a copy of the values, except the ones you made up only for the first sign-in.
+3. `kubectl apply -f k8s/pvc.yaml`, then `kubectl apply -f k8s/deployment.yaml`, then `kubectl apply -f k8s/service.yaml`. Wait for `kubectl -n prism-damo rollout status deployment/prism`. The log should say `sign-in on`.
+4. Restore the accounts: `scripts/restore-data.sh <your latest backup>`. Without a backup, the app creates only the first admin from `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Everyone else must be added again on the Users page with new one-time passwords.
+5. The load balancer address changes with a new Service. Update `LIBRARY_URL` if the Library moved, and tell the team the new address.
+6. Check: `/healthz` answers, `/` redirects to the login page, you can sign in, the Users page lists everyone, one small extraction runs.
+
+**Keep the disk when the claim goes.** Find the volume with `kubectl get pv`, then set `kubectl patch pv <name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'`. The disk then survives a deleted claim or namespace and can be attached to a new cluster by hand. A disk snapshot schedule (AWS Backup or EBS snapshots) also covers a lost disk.
+
 ## Usage and cost logging
 
 The extraction function writes one small record per run to a Netlify Blobs store (`damo-workflow-usage`): time, outcome, model, input and output tokens, cost, run time, and the number, type and size of the documents. It never stores document text or the answer. `usage.html` (on the same site) shows the report, and `/.netlify/functions/extract-usage` returns it as JSON or, with `&format=csv`, one row per run.
