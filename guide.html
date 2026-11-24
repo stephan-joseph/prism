@@ -672,6 +672,18 @@ ${tryTool(1,"Start at step 1 with a fresh estimate (Reset in the header).")}`},
 <input class="search" id="faqQ" type="search" placeholder="Search the questions" aria-label="Search FAQ">
 <div id="faqList"></div>`},
 
+{id:"signin",grp:"Reference",t:"Signing in and roles",html:()=>`
+<p class="lead">If your site asks you to sign in, an administrator made your account. This is what each role can do.</p>
+<ol class="steps">
+<li><div>Open the address. If you are not signed in you land on the sign-in page. Enter your email and password.</div></li>
+<li><div>The first time, you use a one-time password from an administrator. Prism asks you to choose your own (at least 12 characters) before you start.</div></li>
+<li><div>Your name and role show at the top right. <span class="ui">Sign out</span> ends your session. Sessions last 8 hours and renew while you work.</div></li>
+</ol>
+<table><thead><tr><th>Role</th><th>What you can do</th></tr></thead><tbody>
+<tr><td>Viewer</td><td>Open the tool and this guide and use the calculators. Extraction is switched off.</td></tr>
+<tr><td>Estimator</td><td>Everything a viewer can, plus run extraction on documents. Each run is logged with your email, never with the document text.</td></tr>
+<tr><td>Admin</td><td>Everything an estimator can, plus add people, change roles, reset passwords and deactivate accounts (<span class="ui">Users</span>), and read the usage report.</td></tr></tbody></table>
+<div class="note"><b>Passwords</b> Five wrong tries lock the account for 15 minutes. If you forget your password, ask an administrator for a reset. Do not reuse a password from anywhere else: until the site has an encrypted (https) address, the sign-in page shows a warning.</div>`},
 {id:"glossary",grp:"Reference",t:"Glossary",html:()=>`
 <span class="eyebrow">Reference</span>
 <h1>Glossary</h1>
@@ -697,6 +709,8 @@ const EXAMPLE=[
 
 const FAQ=[
  ["Can one estimate cover APAC, North America and Europe?","Yes. Pick all three under Geographies to cover in Step 1, whatever the customer location is. Each keeps its own local hours, and the tool shows the combined window. The week is one daily pattern repeated on the days a week, with no daylight saving, so day edges are approximate."],
+ ["I cannot run extraction. Why?","Your account may be a viewer. Viewers can use the calculators but not extraction. Ask an administrator to make you an estimator."],
+ ["I forgot my password","Ask an administrator for a reset. They give you a one-time password and you choose a new one at your next sign-in."],
  ["Why did my bottom-up team get bigger when I turned on the coverage floor?","The support window needs a minimum number of people on duty in every hour, whatever the activity hours say. If the L2 and L3 roles from your activities come to less, the gap is added so the team can staff the window. Automation cannot take the team below it."],
  ["I changed the support window in bottom-up and my tower estimate moved. Why?","The support window, locations, complexity, contingency, manager ratio and existing team are shared by both methods. Enter them once; a change in either method changes both."],
  ["Is the service delivery lead counted twice?","It can be: if an activity already gives a delivery lead and managers are sized from a ratio, both count. Step 5 lets you size managers from the activities only, and a check warns when both are on."],

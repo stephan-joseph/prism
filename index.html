@@ -56,6 +56,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .deal{display:flex;align-items:center;gap:8px}
 .deal label{font-size:12px;color:var(--muted)}
 .deal input{width:220px;max-width:50vw;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2)}
+.who{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.who a{color:var(--accent)}
+.who .btn{padding:4px 9px;font-size:12px}
 .mbadge{font:600 11px/1 var(--mono);padding:5px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 .mbadge.approved{color:var(--add);border-color:var(--add)}
 .mbadge.stale{color:var(--risk);border-color:var(--risk)}
@@ -568,6 +571,7 @@ tr.sel td{background:var(--accent-soft)}
       <input id="dealName" type="text" placeholder="Client / opportunity name">
     </div>
     <span class="mbadge" id="mBadge"></span>
+    <div class="who" id="whoBox" hidden><span id="whoName"></span><a href="/admin.html" id="whoAdmin" hidden>Users</a><button class="btn ghost" type="button" id="signOut">Sign out</button></div>
     <div class="actions">
       <a class="btn ghost" href="https://damo-estimation-workflow.netlify.app/guide.html" target="_blank" rel="noopener" style="text-decoration:none">Guide</a>
       <div class="menu">
@@ -6819,6 +6823,27 @@ function libraryRefProposals(X,docs){
   const refs=docs.filter(d=>isLibRef(d.text));
   return refs.length?X.sanitizeExtraction(refs.map(d=>parseLibraryReference(d.text)).reduce((acc,x)=>mergeExtractions(acc,x))):null;
 }
+/* Who is signed in. The server answers /api/me with enabled:false when sign-in is off, and the page then looks as it always did. */
+const ACCOUNT={on:false,user:null};
+async function loadAccount(){
+  if(!/^https?:$/.test(location.protocol))return;
+  try{
+    const r=await fetch("/api/me",{credentials:"same-origin",cache:"no-store"});
+    if(!r.ok)return;const j=await r.json();
+    if(!j.enabled)return;
+    ACCOUNT.on=true;ACCOUNT.user=j.user;
+    if(!j.user){location.assign("/login.html?next="+encodeURIComponent(location.pathname));return}
+    $("whoBox").hidden=false;$("whoName").textContent=(j.user.name||j.user.email)+" · "+j.user.role;
+    $("whoAdmin").hidden=j.user.role!=="admin";
+    if(j.user.role==="viewer"){const b=$("xRun");if(b){b.disabled=true;b.title="Your account can view estimates but not run extraction"}}
+    $("xPassRow").hidden=true;
+    if(typeof detectRoute==="function")detectRoute();
+  }catch(e){}
+}
+loadAccount();
+document.addEventListener("click",async e=>{
+  if(e.target&&e.target.id==="signOut"){try{await fetch("/api/logout",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:"{}"})}catch(x){}location.assign("/login.html")}
+});
 function xStatus(msg,err){const el=$("xStatus");el.textContent=msg;el.className="xstatus"+(err?" err":"")}
 async function detectRoute(){
   const inViewer=!!(window.claude&&typeof window.claude.use==="function");
@@ -6827,11 +6852,11 @@ async function detectRoute(){
     try{XSAMPLE=await window.claude.use("sample")}catch(e){XSAMPLE=null}
     XROUTE=XSAMPLE?"sample":"manual";
   }else XROUTE=/^https?:$/.test(location.protocol)?"server":"manual";
-  $("xPassRow").hidden=XROUTE!=="server";
+  $("xPassRow").hidden=XROUTE!=="server"||ACCOUNT.on;
   try{$("xPass").value=localStorage.getItem("damo-workflow-pass")||""}catch(e){}
   $("xRoute").innerHTML=({
     sample:"<b>Runs on your Claude account.</b> The first run asks you to allow this page to use Claude. Documents up to about 250,000 characters.",
-    server:"<b>Runs on this site's Anthropic API key</b> (Claude Opus 5.5). If the site sets a passphrase, enter it below.",
+    server:ACCOUNT.on?"<b>Runs on this site's Anthropic API key.</b> You are signed in, so there is no passphrase. Each run is logged with your email, never with the document text.":"<b>Runs on this site's Anthropic API key</b> (Claude Opus 5.5). If the site sets a passphrase, enter it below.",
     manual:"<b>Extraction isn't available on this page.</b> Use Copy prompt, paste it into a Claude chat, then paste the reply below."
   })[XROUTE];
   if(XROUTE==="manual"){$("xRun").hidden=true;$("xManual").open=true}
@@ -6856,6 +6881,8 @@ async function runExtraction(){
       const pass=$("xPass").value.trim();try{localStorage.setItem("damo-workflow-pass",pass)}catch(e){}
       const jobId=(crypto.randomUUID&&crypto.randomUUID())||uid()+uid();
       const r=await fetch("/.netlify/functions/extract-inputs-background",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({jobId,docs,passphrase:pass,activities:isBU()}),signal:XCTL.signal});
+      if(r.status===401){location.assign("/login.html?next="+encodeURIComponent(location.pathname));throw {code:"cancelled"}}
+      if(r.status===403)throw {code:"forbidden",message:"Your account can view estimates but not run extraction. Ask an administrator for the estimator role."};
       if(r.status===404)throw {code:"no_server",message:"This site has no extraction service. Use Copy prompt and paste Claude's reply below."};
       if(!r.ok&&r.status!==202)throw {code:"server",message:`The extraction service returned ${r.status}.`};
       for(let i=0;i<180;i++){

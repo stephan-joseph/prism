@@ -33,6 +33,8 @@ Open `index.html` in a browser for the calculators. Extraction needs it served o
 python3 -m http.server 8000
 ```
 
+Server checks (extraction handlers, sign-in, roles, the gate; needs `npm install` once): `node scripts/test-server.mjs`.
+
 Self-tests (the engine's checks against the framework's worked examples, plus invariants and feature tests). Expect every test to pass; the count is 241 (188 after the bottom-up method, plus 53 for several customer locations, shift limits, the gap finder and the outputs).
 
 ```bash
@@ -45,18 +47,15 @@ The extraction cleaning in `extract-prompt.mjs` (clauses, activities, option yea
 
 ## Deploy
 
-Netlify serves the repo root and the functions (`netlify.toml`). Pushing the linked branch redeploys. Environment variables, set in the Netlify project and never in the repo:
+The live site runs as a Docker image on the owner's AWS EKS cluster `prism2`, namespace `prism-damo` (`Dockerfile`, `server/server.mjs`, `k8s/`). Build a multi-arch image, push it to `stejose/prism:<tag>`, change the tag in `k8s/deployment.yaml` (commit "Deploy image <tag>") and have the owner run `kubectl apply`. My shell has no cluster login. Netlify (`netlify/functions/`, `netlify.toml`) is the older route and is kept in step by the shared `extract-prompt.mjs`.
 
-| Variable | Needed | Purpose |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | yes | The key the extraction function uses. Create one per environment with a spend limit. |
-| `INTAKE_PASSPHRASE` | yes | A shared password users type to run extraction. It is not an API key. If unset, anyone can run extraction. |
-| `USAGE_ADMIN_KEY` | optional | Turns on the usage report. |
-| `PRICE_MULTIPLIER`, `HOSTING_MONTHLY_USD`, `USD_PER_FUNCTION_SECOND`, `USD_PER_THOUSAND_INVOCATIONS` | optional | Contract discount and hosting rates for the usage report. |
+Settings come from the Secret `prism-secrets` (never in the repo): `ANTHROPIC_AUTH_TOKEN` or `ANTHROPIC_API_KEY`, `INTAKE_PASSPHRASE` (used only while sign-in is off), `USAGE_ADMIN_KEY` (optional), and for sign-in `SESSION_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`. The Deployment sets `ANTHROPIC_BASE_URL`, `EXTRACTION_MODEL`, `LIBRARY_URL`. `k8s/pvc.yaml` holds `/data` (accounts, audit log, usage history); `fsGroup: 1000` lets the node user write to it. One replica only (`Recreate`): extraction jobs are in memory and the stores are plain files.
 
-Extraction uses model `claude-opus-5-5` with high effort, up to 16,000 output tokens and 600,000 characters of input (`netlify/functions/extract-inputs-background.mts`). Job results and usage records are in Netlify Blobs stores `damo-workflow-extraction-jobs` and `damo-workflow-usage`.
+**Access management:** `server/auth.mjs` (scrypt passwords, signed cookie sessions, lockout, roles viewer < estimator < admin, audit log), `server/api.mjs` (the `/api/*` handlers), `server/server.mjs` (`makeServer`: the gate, the role needed per route, the user and role passed to the handlers in `x-prism-user` and `x-prism-role`, which are stripped from every incoming request and trusted only when `SESSION_SECRET` is set). Sign-in is on only when `SESSION_SECRET` is set; otherwise nothing is gated and the passphrase rules extraction. Pages: `login.html`, `admin.html`; `index.html` calls `/api/me` (`loadAccount`) for the header and the extraction box. The address is plain http for now: see "Signing in, roles and users" in the README for the risk. Phase 2 (estimates on the server, sharing) is not built.
 
-The Library address is the constant `LIBRARY_URL` in `index.html`. Change it to the Library's address in this environment.
+Extraction uses `EXTRACTION_MODEL` through the internal gateway (`server/handlers.mjs`, up to 16,000 output tokens and 600,000 characters of input). Usage records are files under `/data/usage`, listed by `/usage.html` (admins).
+
+The Library address is `LIBRARY_URL` (an environment variable served as `/library-config.json`, with the constant `LIBRARY_URL` in `index.html` as the fallback).
 
 ## How the engine works (orientation)
 

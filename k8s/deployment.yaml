@@ -16,6 +16,9 @@ spec:
       labels:
         app: prism
     spec:
+      # The volume is mounted root-owned. This lets the app's user (node, uid 1000) write the accounts and audit files.
+      securityContext:
+        fsGroup: 1000
       containers:
         - name: prism
           image: stejose/prism:20261118-1
@@ -44,9 +47,18 @@ spec:
             # Address of the Prism Library service, used by File, Add to Prism Library. Set it to the Library's address in this cluster.
             - name: USAGE_ADMIN_KEY
               valueFrom: {secretKeyRef: {name: prism-secrets, key: USAGE_ADMIN_KEY, optional: true}}
+            # Sign-in turns on when SESSION_SECRET is set (a long random string). The first administrator is created once,
+            # from ADMIN_EMAIL and ADMIN_PASSWORD, only while there are no accounts; they must change the password at first sign-in.
+            #   kubectl -n prism-damo patch secret prism-secrets --type merge -p '{"stringData":{"SESSION_SECRET":"...","ADMIN_EMAIL":"...","ADMIN_PASSWORD":"..."}}'
+            - name: SESSION_SECRET
+              valueFrom: {secretKeyRef: {name: prism-secrets, key: SESSION_SECRET, optional: true}}
+            - name: ADMIN_EMAIL
+              valueFrom: {secretKeyRef: {name: prism-secrets, key: ADMIN_EMAIL, optional: true}}
+            - name: ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: prism-secrets, key: ADMIN_PASSWORD, optional: true}}
           volumeMounts:
-            - name: usage
-              mountPath: /data/usage
+            - name: data
+              mountPath: /data
           readinessProbe:
             httpGet: {path: /healthz, port: 8080}
           livenessProbe:
@@ -56,5 +68,6 @@ spec:
             requests: {cpu: 100m, memory: 128Mi}
             limits: {cpu: 500m, memory: 512Mi}
       volumes:
-        - name: usage
-          emptyDir: {}
+        - name: data
+          persistentVolumeClaim:
+            claimName: prism-data

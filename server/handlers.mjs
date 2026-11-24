@@ -25,10 +25,10 @@ export function extractHandler({ jobs, usage, env, makeClient, AnthropicErrors =
   /* A gateway may not pass the beta flag, fallbacks or effort through, so the plain request is the default when a base URL is set. */
   const simple = env.EXTRACTION_SIMPLE_REQUEST ? env.EXTRACTION_SIMPLE_REQUEST === "1" : !!env.ANTHROPIC_BASE_URL;
   const hasCredential = !!(env.ANTHROPIC_AUTH_TOKEN || env.ANTHROPIC_API_KEY);
-  const run = async (body) => {
+  const run = async (body, user) => {
     const jobId = body.jobId;
     const t0 = Date.now();
-    const info = { jobId, requestedModel: MODEL, docs: 0, chars: 0, docTypes: [] };
+    const info = { jobId, requestedModel: MODEL, docs: 0, chars: 0, docTypes: [], ...(user ? { user } : {}) };
     let apiMessage = null;
     const log = async (outcome) => {
       try {
@@ -49,7 +49,7 @@ export function extractHandler({ jobs, usage, env, makeClient, AnthropicErrors =
       await log(outcome);
     };
 
-    if (env.INTAKE_PASSPHRASE && body.passphrase !== env.INTAKE_PASSPHRASE) return fail("Incorrect passphrase", {}, "bad_passphrase");
+    if (!user && env.INTAKE_PASSPHRASE && body.passphrase !== env.INTAKE_PASSPHRASE) return fail("Incorrect passphrase", {}, "bad_passphrase");   /* with sign-in on, the gate has already checked who is asking */
     const docs = (body.docs || []).filter((d) => d && typeof d.text === "string" && d.text.trim());
     if (!docs.length) return fail("No document text was sent", {}, "no_docs");
     const total = docs.reduce((n, d) => n + d.text.length, 0);
@@ -90,7 +90,9 @@ export function extractHandler({ jobs, usage, env, makeClient, AnthropicErrors =
     let body;
     try { body = await req.json(); } catch { return new Response(null, { status: 202 }); }
     if (!body?.jobId) return new Response(null, { status: 202 });
-    run(body).catch(async (e) => { try { await jobs.setJSON(body.jobId, { status: "error", error: e?.message || "Extraction failed" }); } catch {} });
+    /* x-prism-user is set by the server's gate after sign-in, and only trusted when sign-in is on */
+    const user = env.SESSION_SECRET ? (req.headers.get("x-prism-user") || "") : "";
+    run(body, user).catch(async (e) => { try { await jobs.setJSON(body.jobId, { status: "error", error: e?.message || "Extraction failed" }); } catch {} });
     return new Response(null, { status: 202 });
   };
 }
@@ -99,9 +101,14 @@ export function extractHandler({ jobs, usage, env, makeClient, AnthropicErrors =
 export function usageHandler({ usage, env }) {
   return async (req) => {
     const key = env.USAGE_ADMIN_KEY;
-    if (!key) return json({ error: "The usage report is off: set USAGE_ADMIN_KEY on the site to turn it on." }, 403);
     const url = new URL(req.url);
-    if ((req.headers.get("x-usage-key") || url.searchParams.get("key")) !== key) return json({ error: "Wrong or missing key" }, 401);
+    /* a signed-in administrator needs no key (x-prism-role is set by the gate and only trusted when sign-in is on) */
+    const admin = !!env.SESSION_SECRET && req.headers.get("x-prism-role") === "admin";
+    if (!admin) {
+      if (env.SESSION_SECRET && !key) return json({ error: "The usage report is for administrators." }, 403);
+      if (!key) return json({ error: "The usage report is off: set USAGE_ADMIN_KEY on the site to turn it on." }, 403);
+      if ((req.headers.get("x-usage-key") || url.searchParams.get("key")) !== key) return json({ error: "Wrong or missing key" }, 401);
+    }
     const { blobs } = await usage.list({ prefix: "run/" });
     const records = [];
     for (const b of blobs) { const r = await usage.get(b.key); if (r) records.push(r); }

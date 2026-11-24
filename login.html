@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Sign in · DAMO Prism</title>
+<style>
+:root{--bg:#F4F5F8;--surface:#FFFFFF;--ink:#18202B;--muted:#5A6472;--line:#DCE0E7;--accent:#9B2F66;--accent-ink:#FFFFFF;--soft:#F7E8F0;--warn:#B3261E;--warn-soft:#FBEAE8;--body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10141A;--surface:#181E27;--ink:#E7EBF0;--muted:#A0A9B6;--line:#2B333F;--accent:#E27AAF;--accent-ink:#1A0E14;--soft:#3A1F2D;--warn:#F08A80;--warn-soft:#3A1F1C}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);min-height:100vh;display:grid;place-items:center;padding:24px 16px}
+main{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:26px 24px;display:grid;gap:14px}
+.eyebrow{font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+h1{margin:4px 0 0;font-size:24px}
+p{margin:0;color:var(--muted);font-size:14px}
+form{display:grid;gap:12px}
+label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+input{padding:9px 11px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit;width:100%}
+button{padding:10px 14px;border:1px solid var(--accent);border-radius:6px;background:var(--accent);color:var(--accent-ink);font:inherit;font-weight:600;cursor:pointer}
+button[disabled]{opacity:.6;cursor:wait}
+.err{background:var(--warn-soft);color:var(--warn);border-radius:6px;padding:9px 11px;font-size:13.5px}
+.note{background:var(--soft);border-radius:6px;padding:9px 11px;font-size:13px;color:var(--ink)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+  <div><span class="eyebrow">Estimation as a Service</span><h1>DAMO Prism</h1></div>
+
+  <form id="fIn" autocomplete="on">
+    <p>Sign in with the account an administrator made for you.</p>
+    <label>Email <input id="email" type="email" autocomplete="username" required autofocus></label>
+    <label>Password <input id="pw" type="password" autocomplete="current-password" required></label>
+    <button id="goIn" type="submit">Sign in</button>
+  </form>
+
+  <form id="fChange" autocomplete="off" hidden>
+    <p id="why">Choose a new password. Use at least 12 characters.</p>
+    <label>Current password <input id="cur" type="password" autocomplete="current-password" required></label>
+    <label>New password <input id="nw" type="password" autocomplete="new-password" minlength="12" required></label>
+    <label>New password again <input id="nw2" type="password" autocomplete="new-password" minlength="12" required></label>
+    <button id="goChange" type="submit">Set the password</button>
+  </form>
+
+  <div class="err" id="err" role="alert" hidden></div>
+  <div class="note" id="plain" hidden>This connection is not encrypted. Do not reuse a password you use anywhere else.</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const next=(()=>{const n=new URLSearchParams(location.search).get("next")||"/";return /^\/[^\/\\]/.test(n)||n==="/"?n:"/"})();
+const show=m=>{$("err").textContent=m||"";$("err").hidden=!m};
+async function call(path,body){
+  const r=await fetch(path,{method:body?"POST":"GET",headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined,credentials:"same-origin"});
+  let j={};try{j=await r.json()}catch(e){}
+  return {ok:r.ok,status:r.status,j};
+}
+function mode(user){
+  $("fIn").hidden=!!user&&user.mustChange;$("fChange").hidden=!(user&&user.mustChange);
+  if(user&&user.mustChange){$("cur").focus();$("why").textContent="Hello "+(user.name||user.email)+". Choose a new password before you start. Use at least 12 characters."}
+}
+(async()=>{
+  $("plain").hidden=location.protocol==="https:";
+  const me=await call("/api/me");
+  if(me.ok&&!me.j.enabled){location.replace("/");return}
+  if(me.ok&&me.j.user){if(me.j.user.mustChange)mode(me.j.user);else location.replace(next)}
+})();
+$("fIn").addEventListener("submit",async e=>{
+  e.preventDefault();show("");$("goIn").disabled=true;
+  const r=await call("/api/login",{email:$("email").value,password:$("pw").value});
+  $("goIn").disabled=false;
+  if(!r.ok){show(r.j.error||"Could not sign in ("+r.status+").");$("pw").value="";$("pw").focus();return}
+  if(r.j.user.mustChange){$("cur").value=$("pw").value;$("pw").value="";mode(r.j.user)}else location.replace(next);
+});
+$("fChange").addEventListener("submit",async e=>{
+  e.preventDefault();show("");
+  if($("nw").value!==$("nw2").value){show("The two new passwords are not the same.");return}
+  $("goChange").disabled=true;
+  const r=await call("/api/password",{current:$("cur").value,next:$("nw").value});
+  $("goChange").disabled=false;
+  if(!r.ok){show(r.j.error||"Could not change the password ("+r.status+").");return}
+  location.replace(next);
+});
+</script>
+</body>
+</html>

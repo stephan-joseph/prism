@@ -95,4 +95,104 @@ let n = 0; const ok = (m) => console.log("ok", ++n, m);
   assert.match((await fetch(base + "/extract-prompt.mjs")).headers.get("content-type"), /javascript/); ok("files the pages load are served: " + [...need].join(" "));
   assert.equal((await fetch(base + "/package.json")).status, 404); ok("other files stay hidden");
   server.close(); }
+
+/* ---- sign-in, roles and the gate (SESSION_SECRET on) ---- */
+{ const { makeServer } = await import("../server/server.mjs");
+  const { hashPassword, checkPassword, passwordProblem, tempPassword } = await import("../server/auth.mjs");
+
+  const h = await hashPassword("a-long-enough-pass"); assert.ok(await checkPassword("a-long-enough-pass", h)); assert.ok(!(await checkPassword("a-long-enough-pasX", h)));
+  assert.ok(h.hash !== "a-long-enough-pass" && !JSON.stringify(h).includes("a-long-enough-pass")); ok("password is hashed and verified");
+  assert.ok(passwordProblem("short")); assert.equal(passwordProblem("twelve-chars!"), ""); assert.notEqual(tempPassword(), tempPassword()); ok("password rules, temporary passwords differ");
+
+  const dir = mkdtempSync(path.join(tmpdir(), "d-"));
+  let clock = Date.now();
+  const stub = reply('{"towers":[]}');
+  const env = { SESSION_SECRET: "test-secret-0123456789", ADMIN_EMAIL: "Boss@Example.test", ADMIN_PASSWORD: "first-admin-pass-1", ANTHROPIC_API_KEY: "k", INTAKE_PASSPHRASE: "should-not-matter" };
+  const srv = makeServer({ env, dataDir: dir, makeClient: clientOf(stub), now: () => clock });
+  await srv.ready; await new Promise((r) => srv.listen(0, r));
+  const base = "http://localhost:" + srv.address().port;
+  const call = async (p, o = {}) => { const r = await fetch(base + p, { redirect: "manual", ...o, headers: { "Content-Type": "application/json", ...(o.headers || {}) } }); let j = null; try { j = await r.clone().json(); } catch {} return { r, j, status: r.status }; };
+  const post = (p, body, cookie, extra = {}) => call(p, { method: "POST", body: JSON.stringify(body), headers: { ...(cookie ? { Cookie: cookie } : {}), ...extra } });
+  const get = (p, cookie, extra = {}) => call(p, { headers: { ...(cookie ? { Cookie: cookie } : {}), ...extra } });
+  const ck = (res) => (res.r.headers.get("set-cookie") || "").split(";")[0];
+  const login = async (email, password) => { const x = await post("/api/login", { email, password }); return { ...x, cookie: ck(x) }; };
+
+  /* anonymous */
+  assert.equal((await get("/healthz")).status, 200); ok("healthz stays open");
+  for (const p of ["/", "/index.html", "/guide.html", "/usage.html", "/admin.html", "/docs/example-acme-retail.damo.json"]) { const x = await get(p); assert.equal(x.status, 302, p); assert.match(x.r.headers.get("location"), /^\/login\.html/); }
+  assert.equal((await get("/login.html")).status, 200); ok("anonymous pages redirect to the sign-in page, which stays open");
+  for (const p of ["/api/users", "/api/audit", "/library-config.json", "/.netlify/functions/extract-usage", "/.netlify/functions/extract-status?jobId=x"]) assert.equal((await get(p)).status, p === "/library-config.json" ? 302 : 401, p);
+  assert.equal((await post("/.netlify/functions/extract-inputs-background", { jobId: "z", docs: [{ text: "x" }] })).status, 401); ok("anonymous API calls get 401");
+  assert.equal((await get("/extract-prompt.mjs")).status, 302); ok("the prompt module is behind sign-in too");
+  assert.equal((await get("/api/me")).j.user, null); ok("me says nobody is signed in");
+
+  /* first admin, bad passwords, lockout */
+  const bad1 = await login("boss@example.test", "wrong-password-here"), bad2 = await login("nobody@example.test", "wrong-password-here");
+  assert.equal(bad1.status, 401); assert.equal(bad1.j.error, bad2.j.error); ok("a wrong password and an unknown account give the same answer");
+  for (let i = 0; i < 4; i++) await login("boss@example.test", "wrong-password-here");
+  const locked = await login("boss@example.test", "first-admin-pass-1"); assert.equal(locked.status, 429); ok("five failures lock the account, even for the right password");
+  clock += 16 * 60 * 1000; const adm = await login("BOSS@example.test ", "first-admin-pass-1"); assert.equal(adm.status, 200); ok("the lock lifts after 15 minutes, and email case and spaces do not matter");
+  assert.ok(adm.cookie.startsWith("prism_session=")); assert.match(adm.r.headers.get("set-cookie"), /HttpOnly/); assert.match(adm.r.headers.get("set-cookie"), /SameSite=Lax/); assert.doesNotMatch(adm.r.headers.get("set-cookie"), /Secure/); ok("session cookie is HttpOnly and SameSite, and not Secure over plain http");
+  const sec = await post("/api/login", { email: "boss@example.test", password: "first-admin-pass-1" }, null, { "X-Forwarded-Proto": "https" }); assert.match(sec.r.headers.get("set-cookie"), /Secure/); assert.ok(sec.r.headers.get("strict-transport-security")); ok("over HTTPS the cookie is Secure and HSTS is sent");
+  assert.equal(adm.j.user.mustChange, true); assert.equal((await get("/", adm.cookie)).status, 302); assert.equal((await get("/api/users", adm.cookie)).status, 403); ok("a first sign-in must change the password before anything else");
+  assert.equal((await post("/api/password", { current: "first-admin-pass-1", next: "short" }, adm.cookie)).status, 400);
+  assert.equal((await post("/api/password", { current: "wrong-current-pass", next: "a-new-admin-pass-22" }, adm.cookie)).status, 400);
+  const ch = await post("/api/password", { current: "first-admin-pass-1", next: "a-new-admin-pass-22" }, adm.cookie); assert.equal(ch.status, 200); const A = ck(ch); ok("password change checks the old one and the length");
+  assert.equal((await get("/api/users", adm.cookie)).status, 401); ok("the old session ends when the password changes");
+  assert.equal((await get("/", A)).status, 200); assert.match((await get("/", A)).r.headers.get("x-frame-options"), /DENY/); ok("a signed-in person reaches the pages, with security headers");
+
+  /* a tampered or expired cookie */
+  assert.equal((await get("/api/users", A.slice(0, -3) + "abc")).status, 401); assert.equal((await get("/api/users", "prism_session=garbage")).status, 401); ok("a tampered cookie is refused");
+
+  /* users */
+  const mkU = async (email, role) => { const x = await post("/api/users/create", { email, name: email.split("@")[0], role }, A); assert.equal(x.status, 200, JSON.stringify(x.j)); return x.j.tempPassword; };
+  assert.equal((await post("/api/users/create", { email: "bad", role: "viewer" }, A)).status, 400); assert.equal((await post("/api/users/create", { email: "x@example.test", role: "boss" }, A)).status, 400);
+  const tpE = await mkU("est@example.test", "estimator"), tpV = await mkU("view@example.test", "viewer"); assert.equal((await post("/api/users/create", { email: "est@example.test", role: "viewer" }, A)).status, 400); ok("admin creates users, with checks and no duplicates");
+  const ev = await login("est@example.test", tpE); assert.equal(ev.j.user.mustChange, true);
+  const E = ck(await post("/api/password", { current: tpE, next: "estimator-pass-123" }, ev.cookie));
+  const V = ck(await post("/api/password", { current: tpV, next: "viewer-pass-12345" }, (await login("view@example.test", tpV)).cookie)); ok("a temporary password is changed at first sign-in");
+  assert.equal((await login("est@example.test", tpE)).status, 401); ok("the temporary password stops working once changed");
+
+  /* role matrix */
+  const docs = { jobId: "r1", docs: [{ type: "rfp", name: "d", text: "hello" }] };
+  const code = async (m, p, c, b) => (m === "GET" ? get(p, c) : post(p, b || {}, c)).then((x) => x.status);
+  assert.equal(await code("GET", "/", V), 200); assert.equal(await code("GET", "/guide.html", V), 200); assert.equal(await code("GET", "/library-config.json", V), 200);
+  assert.equal(await code("POST", "/.netlify/functions/extract-inputs-background", V, docs), 403); assert.equal(await code("GET", "/.netlify/functions/extract-status?jobId=x", V), 403);
+  assert.equal(await code("GET", "/api/users", V), 403); assert.equal(await code("GET", "/usage.html", V), 302); assert.equal(await code("GET", "/.netlify/functions/extract-usage", V), 403); ok("viewer: opens the tool, cannot extract, no admin");
+  assert.equal(await code("POST", "/.netlify/functions/extract-inputs-background", E, docs), 202);
+  assert.equal(await code("GET", "/api/users", E), 403); assert.equal(await code("GET", "/admin.html", E), 302); assert.equal(await code("GET", "/.netlify/functions/extract-usage", E), 403); ok("estimator: extracts, no admin");
+  assert.equal(await code("GET", "/api/users", A), 200); assert.equal(await code("GET", "/usage.html", A), 200); assert.equal(await code("GET", "/admin.html", A), 200); ok("admin: users, usage page, admin page");
+  assert.equal(await code("POST", "/.netlify/functions/extract-inputs-background", null, docs), 401); ok("extraction needs a session, not the shared passphrase");
+  const done = await (async () => { for (let i = 0; i < 50; i++) { const j = (await get("/.netlify/functions/extract-status?jobId=r1", E)).j; if (j && j.status === "done") return j; await wait(20); } return null; })();
+  assert.ok(done); ok("a signed-in estimator's extraction runs, with no passphrase");
+
+  /* the person and role headers cannot be forged, and the run is logged with the email */
+  await wait(80);
+  const um = await get("/.netlify/functions/extract-usage?days=30", A); assert.equal(um.status, 200);
+  const files = (await fileStore(path.join(dir, "usage")).list({ prefix: "run/" })).blobs;
+  const rec = await fileStore(path.join(dir, "usage")).get(files[0].key); assert.equal(rec.user, "est@example.test"); assert.ok(!JSON.stringify(rec).includes("hello")); ok("the run record carries the email and never the document text");
+  const forged = await get("/.netlify/functions/extract-usage", E, { "x-prism-role": "admin" }); assert.equal(forged.status, 403); ok("a forged role header does nothing");
+
+  /* role and status changes take effect at once, and the last admin cannot be removed */
+  assert.equal((await post("/api/users/update", { email: "est@example.test", role: "viewer" }, A)).status, 200);
+  assert.equal(await code("GET", "/", E), 302); ok("changing a role signs the person out");
+  const E2 = ck(await login("est@example.test", "estimator-pass-123")); assert.equal(await code("POST", "/.netlify/functions/extract-inputs-background", E2, docs), 403); ok("the new role applies on the next sign-in");
+  assert.equal((await post("/api/users/update", { email: "view@example.test", active: false }, A)).status, 200); assert.equal(await code("GET", "/", V), 302); assert.equal((await login("view@example.test", "viewer-pass-12345")).status, 401); ok("a deactivated person is out at once and cannot sign in");
+  assert.equal((await post("/api/users/update", { email: "boss@example.test", role: "viewer" }, A)).status, 400); assert.equal((await post("/api/users/update", { email: "boss@example.test", active: false }, A)).status, 400); ok("the last administrator cannot be demoted or deactivated");
+  const rs = await post("/api/users/reset", { email: "est@example.test" }, A); assert.equal(rs.status, 200); assert.equal((await login("est@example.test", "estimator-pass-123")).status, 401); assert.equal((await login("est@example.test", rs.j.tempPassword)).j.user.mustChange, true); ok("an admin reset gives a one-time password and ends the old one");
+  const au = await get("/api/audit", A); assert.ok(au.j.events.some((e) => e.event === "user_created") && au.j.events.some((e) => e.event === "login_failed")); assert.ok(!JSON.stringify(au.j).includes("estimator-pass-123")); ok("the audit log records events and never a password");
+  assert.equal((await post("/api/login", { email: "boss@example.test", password: "x" }, null, { Origin: "http://evil.example" })).status, 403); ok("a request from another site is refused");
+  const tp3 = await mkU("est3@example.test", "estimator"), E3 = ck(await post("/api/password", { current: tp3, next: "estimator3-pass-123" }, (await login("est3@example.test", tp3)).cookie));
+  assert.equal((await post("/api/users/create", { email: "n@example.test", role: "viewer" }, E3)).status, 403); ok("only an administrator can add people");
+  clock += 9 * 3600 * 1000; assert.equal((await get("/api/users", A)).status, 401); ok("a session ends after 8 hours");
+  srv.close();
+
+  /* sign-in off: nothing changes */
+  const off = makeServer({ env: { ANTHROPIC_API_KEY: "k", INTAKE_PASSPHRASE: "pp" }, dataDir: mkdtempSync(path.join(tmpdir(), "o-")), makeClient: clientOf(stub) });
+  await off.ready; await new Promise((r) => off.listen(0, r));
+  const ob = "http://localhost:" + off.address().port;
+  assert.equal((await fetch(ob + "/")).status, 200); assert.equal((await fetch(ob + "/admin.html")).status, 200 && 200); assert.equal((await (await fetch(ob + "/api/me")).json()).enabled, false); assert.equal((await fetch(ob + "/api/users")).status, 404);
+  assert.equal((await fetch(ob + "/.netlify/functions/extract-usage")).status, 403); ok("with sign-in off the site is open and the passphrase still rules extraction");
+  off.close();
+}
 console.log("all server tests pass");

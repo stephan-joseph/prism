@@ -69,9 +69,11 @@ const n=x=>(+x).toLocaleString();
 const endpoint="/.netlify/functions/extract-usage";
 try{$("key").value=sessionStorage.getItem("damo-usage-key")||""}catch(e){}
 async function load(fmt){
-  const key=$("key").value.trim(); if(!key){$("msg").innerHTML='<span class="err">Enter the admin key.</span>';return null}
-  try{sessionStorage.setItem("damo-usage-key",key)}catch(e){}
-  const r=await fetch(`${endpoint}?days=${$("days").value}${fmt?"&format="+fmt:""}`,{headers:{"x-usage-key":key}});
+  /* a signed-in administrator needs no key; the key still works where sign-in is off */
+  const key=$("key").value.trim();
+  try{if(key)sessionStorage.setItem("damo-usage-key",key)}catch(e){}
+  const r=await fetch(`${endpoint}?days=${$("days").value}${fmt?"&format="+fmt:""}`,{headers:key?{"x-usage-key":key}:{},credentials:"same-origin"});
+  if(r.status===401){let j={};try{j=await r.clone().json()}catch(e){} if(j.signIn){location.assign("/login.html?next=/usage.html");return null}}
   if(!r.ok){let m="";try{m=(await r.json()).error}catch(e){} $("msg").innerHTML=`<span class="err">${m||"Could not load usage ("+r.status+")."}</span>`;return null}
   $("msg").textContent="";return r;
 }
