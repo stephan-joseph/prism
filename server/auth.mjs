@@ -83,7 +83,7 @@ export function createAuth({ env, users, audit, now = () => Date.now() }) {
   }
 
   return {
-    enabled, sign, parse, publicUser, log, listUsers,
+    enabled, sign, parse, publicUser, log, listUsers, getUser,
 
     /* the first admin, only when there are no accounts at all */
     async bootstrap() {

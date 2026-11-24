@@ -9,6 +9,7 @@ import { memoryStore, fileStore } from "./store.mjs";
 import { statusHandler, extractHandler, usageHandler } from "./handlers.mjs";
 import { createAuth } from "./auth.mjs";
 import { authApi } from "./api.mjs";
+import { estimatesApi, MAX_BYTES } from "./estimates.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MAX_BODY = 5 * 1024 * 1024; /* 600,000 characters of text, with room for JSON escaping */
@@ -27,6 +28,7 @@ export function makeServer({ env = process.env, dataDir = env.DATA_DIR || "/data
   const users = fileStore(path.join(dataDir, "users")), audit = fileStore(path.join(dataDir, "audit"));
   const auth = createAuth({ env, users, audit, ...(now ? { now } : {}) });
   const api = authApi({ auth });
+  const est = estimatesApi({ store: fileStore(path.join(dataDir, "estimates")), auth, ...(now ? { now } : {}) });
   const client = makeClient || ((e) => new Anthropic({
     /* A gateway token is sent as "Authorization: Bearer"; a plain key as "x-api-key". The token wins if both are set. */
     ...(e.ANTHROPIC_AUTH_TOKEN ? { authToken: e.ANTHROPIC_AUTH_TOKEN, apiKey: null } : { apiKey: e.ANTHROPIC_API_KEY }),
@@ -49,6 +51,12 @@ export function makeServer({ env = process.env, dataDir = env.DATA_DIR || "/data
     "/api/users": ["GET", "admin", api.users], "/api/users/create": ["POST", "admin", api.createUser],
     "/api/users/update": ["POST", "admin", api.updateUser], "/api/users/reset": ["POST", "admin", api.resetPassword],
     "/api/audit": ["GET", "admin", api.audit],
+    /* estimates saved on the server: [method, lowest role, handler, ignored, largest body]. A viewer may list and open what is shared with them. */
+    "/api/estimates": ["GET", "viewer", est.list],
+    "/api/estimates/get": ["GET", "viewer", est.get],
+    "/api/estimates/save": ["POST", "estimator", est.save, false, MAX_BYTES + 64 * 1024],
+    "/api/estimates/delete": ["POST", "estimator", est.remove],
+    "/api/estimates/share": ["POST", "estimator", est.share],
   };
 
   async function readBody(req, max = MAX_BODY) {
@@ -102,10 +110,10 @@ export function makeServer({ env = process.env, dataDir = env.DATA_DIR || "/data
         if (req.method === "POST") {
           const origin = req.headers.origin;   /* a form on another site cannot call this with the visitor's cookie */
           if (origin && new URL(origin).host !== req.headers.host) return json(403, { error: "Blocked: the request came from another site." });
-          try { body = JSON.parse((await readBody(req, MAX_API_BODY)).toString("utf8") || "{}"); } catch (e) { if (e.status) throw e; return json(400, { error: "Send JSON." }); }
+          try { body = JSON.parse((await readBody(req, apiRoute[4] || MAX_API_BODY)).toString("utf8") || "{}"); } catch (e) { if (e.status) throw e; return json(400, { error: "Send JSON." }); }
           if (!body || typeof body !== "object") body = {};
         }
-        const r = await apiRoute[2](body, { session, ip: asked, secure });
+        const r = await apiRoute[2](body, { session, ip: asked, secure, query: Object.fromEntries(url.searchParams) });
         return json(r.status, r.body, { ...renew, ...(r.cookie ? { "Set-Cookie": r.cookie } : {}) });
       }
       if (p === "/library-config.json") return json(200, { url: env.LIBRARY_URL || "" });

@@ -56,6 +56,19 @@ button,input,select,textarea{font:inherit;color:inherit}
 .deal{display:flex;align-items:center;gap:8px}
 .deal label{font-size:12px;color:var(--muted)}
 .deal input{width:220px;max-width:50vw;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2)}
+.srvbar{position:sticky;top:0;z-index:30;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;background:var(--soft,#F7E8F0);border-bottom:1px solid var(--accent);padding:7px 14px;font-size:13px}
+.srvbar[hidden]{display:none}
+#srvDlg{border:1px solid var(--line);border-radius:12px;padding:0;background:var(--surface);color:var(--ink);width:min(760px,calc(100vw - 24px));max-height:calc(100vh - 40px)}
+#srvDlg::backdrop{background:rgba(0,0,0,.4)}
+.srvbox{padding:16px 18px;display:grid;gap:12px;max-height:calc(100vh - 44px);overflow:auto}
+.srvhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.srvhead h3{margin:0;font-size:17px}
+.srvrow{border:1px solid var(--line);border-radius:8px;padding:9px 11px;display:grid;gap:6px;background:var(--surface-2,var(--surface))}
+.srvrow .meta{font-size:12.5px;color:var(--muted)}
+.srvrow .acts{display:flex;flex-wrap:wrap;gap:6px}
+.srvtag{font:600 11px/1 var(--mono);padding:3px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.srvmsg{font-size:13px;padding:8px 10px;border-radius:6px;background:var(--soft,#F7E8F0)}
+.srvmsg.err{background:var(--warn-soft);color:var(--warn)}
 .who{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);white-space:nowrap}
 .who a{color:var(--accent)}
 .who .btn{padding:4px 9px;font-size:12px}
@@ -579,6 +592,8 @@ tr.sel td{background:var(--accent-soft)}
         <div class="menupop" id="fileMenu" role="menu" hidden>
           <button type="button" role="menuitem" id="openBtn">Open file…<small>Replaces the estimate on screen</small></button>
           <button type="button" role="menuitem" id="saveBtn">Save file<small>Every input, to reopen or share</small></button>
+          <button type="button" role="menuitem" id="srvSaveBtn" hidden>Save to server<small>Keeps it on the site, for you and people you share it with</small></button>
+          <button type="button" role="menuitem" id="srvOpenBtn" hidden>Open from server…<small>Your estimates and ones shared with you</small></button>
           <button type="button" role="menuitem" id="libBtn">Add to Prism Library…<small>Opens the Library with this estimate</small></button>
           <button type="button" role="menuitem" id="methodBtn">Sizing method<small></small></button>
           <button type="button" role="menuitem" id="freshBtn" aria-pressed="false">Start fresh on every visit<small></small></button>
@@ -608,6 +623,11 @@ tr.sel td{background:var(--accent-soft)}
   </div>
 </nav>
 
+<div class="srvbar" id="srvBar" hidden></div>
+<dialog id="srvDlg" aria-labelledby="srvDlgH"><div class="srvbox">
+  <div class="srvhead"><h3 id="srvDlgH">Estimates on the server</h3><button class="btn ghost" type="button" id="srvClose" aria-label="Close">Close</button></div>
+  <div id="srvBody"></div>
+</div></dialog>
 <main class="wrap">
   <!-- ===================== STAGE 0: DOCUMENTS ===================== -->
   <section id="stage0" class="stage" aria-labelledby="s0h" hidden>
@@ -2591,7 +2611,7 @@ function pyrOf(){const p=S.pyr&&S.pyr[S.cplx];return Array.isArray(p)&&p.length=
 function cpxKnown(t){return t.cpx===true}
 function cpxState(t){return t.cpx===true||t.cpx===false?t.cpx:null}
 const CX_UNSET={name:"Not set",desc:"choose Low, Medium or High",pyr:[1,2,4],cont:0};
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){if(typeof SRV!=="undefined"&&SRV.ro)return;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 
 /* ---------- engine ---------- */
 const riskPctOf=k=>S.risks[k].filter(r=>r.on).reduce((s,r)=>s+(+r.pct||0),0)/100;
@@ -6330,6 +6350,7 @@ async function openEstimate(file){
     const j=JSON.parse(await file.text());
     if(!j||j.app!=="damo-estimation-workflow"||!j.state||typeof j.state!=="object")throw new Error("not an estimate");
     S=migrate(j.state);
+    if(typeof SRV!=="undefined"){SRV.ro=false;SRV.id=null;SRV.version=0;srvStore();srvBanner()}   /* a file is your own copy, not the server's */
     if(Array.isArray(j.scenarios)&&j.scenarios.length){const list=scnLoad();j.scenarios.forEach(x=>{if(x&&x.id&&x.state&&!list.some(q=>q.id===x.id))list.push(x)});scnSave(list)}
     renderAll();go(S.active||1);
     toast(`Opened ${S.deal||file.name}: version ${S.meta.version}, ${approvalStale()?"changed since approval":STATUS[S.meta.status].toLowerCase()}`);
@@ -6837,10 +6858,147 @@ async function loadAccount(){
     $("whoAdmin").hidden=j.user.role!=="admin";
     if(j.user.role==="viewer"){const b=$("xRun");if(b){b.disabled=true;b.title="Your account can view estimates but not run extraction"}}
     $("xPassRow").hidden=true;
+    $("srvSaveBtn").hidden=false;$("srvOpenBtn").hidden=false;
+    if(j.user.role==="viewer")$("srvSaveBtn").hidden=true;
+    srvRestore();srvBanner();
     if(typeof detectRoute==="function")detectRoute();
   }catch(e){}
 }
 loadAccount();
+/* ---------- estimates saved on the server ----------
+   The browser copy stays the working copy. Saving to the server is a choice, and a view-only estimate never writes over the browser copy. */
+const SRV={id:null,version:0,access:"owner",owner:"",ro:false,list:[],share:null,filter:"",msg:"",err:false};
+const SRV_KEY="damo-srv-link";
+function srvStore(){try{if(SRV.id&&!SRV.ro)localStorage.setItem(SRV_KEY,JSON.stringify({id:SRV.id,version:SRV.version,owner:SRV.owner,deal:S.deal||""}));else localStorage.removeItem(SRV_KEY)}catch(e){}}
+function srvRestore(){try{const j=JSON.parse(localStorage.getItem(SRV_KEY)||"null");if(j&&/^[a-f0-9]{16}$/.test(j.id)){SRV.id=j.id;SRV.version=+j.version||0;SRV.owner=j.owner||"";SRV.access="owner"}}catch(e){}}
+async function srvCall(path,body){
+  try{
+    const r=await fetch(path,{method:body?"POST":"GET",credentials:"same-origin",headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined});
+    let j={};try{j=await r.json()}catch(e){}
+    if(r.status===401){location.assign("/login.html?next="+encodeURIComponent(location.pathname));return {ok:false,status:401,j}}
+    return {ok:r.ok,status:r.status,j};
+  }catch(e){return {ok:false,status:0,j:{error:"Could not reach the server."}}}
+}
+function srvBanner(){
+  const b=$("srvBar");if(!b)return;
+  if(SRV.ro){b.hidden=false;b.innerHTML=`<span><b>View only.</b> ${esc(S.deal||"This estimate")} belongs to ${esc(SRV.owner)}. Nothing you change here is saved, and your own browser copy is untouched.</span><button class="btn sm" type="button" data-srv="copy">Save a copy to my estimates</button><button class="btn sm ghost" type="button" data-srv="leave">Back to my own estimate</button>`}
+  else if(SRV.id&&ACCOUNT.on){b.hidden=false;b.innerHTML=`<span>On the server: <b>${esc(S.deal||"Untitled")}</b>, version ${SRV.version}${SRV.access==="edit"?` (shared with you to edit; owner ${esc(SRV.owner)})`:""}. Use File, Save to server to save changes.</span>`}
+  else b.hidden=true;
+}
+function srvAdopt(est,ro){
+  S=migrate(clone(est.state));SRV.id=est.id;SRV.version=est.version;SRV.owner=est.owner;SRV.access=est.access;SRV.ro=!!ro;
+  if(!ro)save();srvStore();srvBanner();renderAll();go(S.active||1);
+}
+async function srvSave(){
+  if(!ACCOUNT.on){toast("Sign-in is off on this site, so there is no server to save to.");return}
+  if(ACCOUNT.user&&ACCOUNT.user.role==="viewer"){toast("Your account cannot save to the server. Ask an administrator for the estimator role.");return}
+  if(SRV.ro){await srvCopy();return}
+  const body=SRV.id?{id:SRV.id,version:SRV.version,state:S}:{state:S};
+  const r=await srvCall("/api/estimates/save",body);
+  if(r.ok){SRV.id=r.j.estimate.id;SRV.version=r.j.estimate.version;SRV.owner=r.j.estimate.owner;SRV.access=r.j.estimate.access;srvStore();srvBanner();toast(`Saved to the server: version ${SRV.version}`);return}
+  if(r.status===409){
+    const c=r.j.current;
+    if(confirm(`${c.updatedBy||"Someone"} saved a newer version (${c.version}) first.\n\nOK: open their version (your unsaved changes here are replaced).\nCancel: keep yours. Use File, Save file to keep a copy, then open theirs from the server.`))srvAdopt(c,false);
+    return;
+  }
+  toast(r.j.error||"Could not save to the server.");
+}
+async function srvCopy(){
+  const r=await srvCall("/api/estimates/save",{state:S});
+  if(!r.ok){toast(r.j.error||"Could not save a copy.");return}
+  SRV.ro=false;SRV.id=r.j.estimate.id;SRV.version=r.j.estimate.version;SRV.owner=r.j.estimate.owner;SRV.access="owner";save();srvStore();srvBanner();renderAll();toast("Saved a copy to your estimates. You can edit it now.");
+}
+function srvLeave(){S=load();SRV.id=null;SRV.ro=false;SRV.version=0;srvRestore();srvBanner();renderAll();go(S.active||1)}
+const srvAgo=iso=>{const m=Math.round((Date.now()-new Date(iso))/60000);return m<1?"just now":m<60?m+" min ago":m<1440?Math.round(m/60)+" h ago":new Date(iso).toISOString().slice(0,10)};
+async function srvOpenDialog(){
+  $("srvDlg").showModal();SRV.msg="";SRV.share=null;SRV.filter="";
+  $("srvBody").innerHTML='<div class="srvmsg">Loading…</div>';
+  const r=await srvCall("/api/estimates");
+  if(!r.ok){$("srvBody").innerHTML=`<div class="srvmsg err">${esc(r.j.error||"Could not load the list.")}</div>`;return}
+  SRV.list=r.j.estimates;srvDraw();
+}
+function srvDraw(){
+  const me=ACCOUNT.user||{},f=SRV.filter.trim().toLowerCase();
+  if(SRV.share)return srvDrawShare();
+  const rows=SRV.list.filter(x=>!f||(x.deal+" "+x.owner).toLowerCase().includes(f));
+  const mine=rows.filter(x=>x.owner===me.email),other=rows.filter(x=>x.owner!==me.email);
+  const row=x=>`<div class="srvrow" data-id="${esc(x.id)}"><div><b>${esc(x.deal||"Untitled")}</b> <span class="srvtag">v${x.version}</span> <span class="srvtag">${esc(x.status)}</span> <span class="srvtag">${x.owner===me.email?"yours":x.access==="owner"?"admin":x.access==="edit"?"you can edit":"view only"}</span>${x.orgView?' <span class="srvtag">everyone can view</span>':""}</div>
+    <div class="meta">${x.owner===me.email?"":"Owner "+esc(x.owner)+" · "}updated ${esc(srvAgo(x.updatedAt))}${x.updatedBy&&x.updatedBy!==x.owner?" by "+esc(x.updatedBy):""}${x.shared?" · shared with "+x.shared:""}</div>
+    <div class="acts"><button class="btn sm" type="button" data-srvopen="${esc(x.id)}">Open</button>${x.access==="owner"?`<button class="btn sm" type="button" data-srvshare="${esc(x.id)}">Share…</button><button class="btn sm ghost" type="button" data-srvdel="${esc(x.id)}">Delete</button>`:""}</div></div>`;
+  $("srvBody").innerHTML=`${SRV.msg?`<div class="srvmsg ${SRV.err?"err":""}">${esc(SRV.msg)}</div>`:""}
+    <label style="display:grid;gap:4px;font-size:13px;color:var(--muted)">Filter by deal or owner<input id="srvFilter" type="search" value="${esc(SRV.filter)}" placeholder="Type to filter"></label>
+    <div class="hint">Opening replaces the estimate on screen. Save your current one first (File, Save to server or Save file) if you need it.</div>
+    ${mine.length?`<div><b>Your estimates</b></div>${mine.map(row).join("")}`:""}
+    ${other.length?`<div><b>Shared with you${me.role==="admin"?" and others (admin view)":""}</b></div>${other.map(row).join("")}`:""}
+    ${rows.length?"":`<div class="srvmsg">${SRV.list.length?"Nothing matches that filter.":"No estimates on the server yet. Use File, Save to server."}</div>`}`;
+}
+/* add the email typed in the box to the list. quiet=true is for Save sharing: nothing typed is fine, a problem stops the save. Returns false if the save should stop. */
+function srvAddTyped(quiet){
+  const box=$("srvAddEmail");if(!box||!SRV.share)return true;
+  const em=box.value.trim().toLowerCase(),acc=$("srvAddAcc").value;
+  SRV.share.org=$("srvOrg").checked;
+  if(!em)return true;
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){SRV.msg=`"${em}" is not an email address.`;SRV.err=true;srvDrawShare();return false}
+  if(SRV.share.list.some(x=>x.email===em)){SRV.msg=em+" is already in the list.";SRV.err=true;srvDrawShare();return false}
+  SRV.share.list.push({email:em,access:acc});SRV.msg=quiet?"":em+" added. Press Save sharing to finish.";SRV.err=false;srvDrawShare();return true;
+}
+function srvDrawShare(){
+  const sh=SRV.share, e=SRV.list.find(x=>x.id===sh.id)||{deal:""};
+  $("srvBody").innerHTML=`<div><b>Share: ${esc(e.deal||"Untitled")}</b></div>
+    ${SRV.msg?`<div class="srvmsg ${SRV.err?"err":""}">${esc(SRV.msg)}</div>`:""}
+    <div class="hint">Only people with an account can be added (the Users page, for administrators). View lets them open it read only. Edit lets them save changes.</div>
+    ${sh.list.map((x,i)=>`<div class="srvrow"><div class="acts" style="align-items:center;justify-content:space-between"><span>${esc(x.email)}</span><span class="acts"><select data-srvacc="${i}" aria-label="Access for ${esc(x.email)}"><option value="view" ${x.access==="view"?"selected":""}>view</option><option value="edit" ${x.access==="edit"?"selected":""}>edit</option></select><button class="btn sm ghost" type="button" data-srvrm="${i}">Remove</button></span></div></div>`).join("")||'<div class="srvmsg">Not shared with anyone.</div>'}
+    <div class="acts" style="align-items:end"><label style="display:grid;gap:4px;font-size:13px;color:var(--muted)">Add by email<input id="srvAddEmail" type="email" placeholder="name@company.com" style="width:240px"></label><label style="display:grid;gap:4px;font-size:13px;color:var(--muted)">Access<select id="srvAddAcc"><option value="view">view</option><option value="edit">edit</option></select></label><button class="btn sm" type="button" id="srvAddBtn">Add</button></div>
+    <label class="inline" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="srvOrg" ${sh.org?"checked":""}> Everyone signed in can view it (read only)</label>
+    <div class="acts"><button class="btn primary" type="button" id="srvShareSave">Save sharing (${sh.list.length?sh.list.length+" "+(sh.list.length===1?"person":"people"):"nobody"}${sh.org?", everyone can view":""})</button><button class="btn ghost" type="button" id="srvShareBack">Back</button></div>`;
+}
+document.addEventListener("click",async e=>{
+  const t=e.target.closest?e.target.closest("button,[data-srv],[data-srvopen],[data-srvshare],[data-srvdel],[data-srvrm]"):null;if(!t)return;
+  const d=t.dataset;
+  if(t.id==="srvSaveBtn"){srvSave();return}
+  if(t.id==="srvOpenBtn"){srvOpenDialog();return}
+  if(t.id==="srvClose"){$("srvDlg").close();return}
+  if(d.srv==="copy"){srvCopy();return}
+  if(d.srv==="leave"){srvLeave();return}
+  if(d.srvopen){
+    const r=await srvCall("/api/estimates/get?id="+encodeURIComponent(d.srvopen));
+    if(!r.ok){SRV.msg=r.j.error||"Could not open it.";SRV.err=true;srvDraw();return}
+    $("srvDlg").close();srvAdopt(r.j.estimate,!(r.j.estimate.access==="owner"||r.j.estimate.access==="edit")||(ACCOUNT.user&&ACCOUNT.user.role==="viewer"));
+    toast(SRV.ro?"Opened view only":"Opened from the server");return}
+  if(d.srvshare){
+    const r=await srvCall("/api/estimates/get?id="+encodeURIComponent(d.srvshare));
+    if(!r.ok){SRV.msg=r.j.error||"Could not open sharing.";SRV.err=true;srvDraw();return}
+    SRV.share={id:d.srvshare,list:(r.j.estimate.sharedWith||[]).map(x=>({...x})),org:!!r.j.estimate.orgView};SRV.msg="";srvDraw();return}
+  if(d.srvdel){
+    if(!d.armed){d.armed="1";t.textContent="Click again to delete";setTimeout(()=>{if(t.isConnected){t.textContent="Delete";delete d.armed}},3000);return}
+    const r=await srvCall("/api/estimates/delete",{id:d.srvdel});
+    SRV.msg=r.ok?"Deleted.":(r.j.error||"Could not delete.");SRV.err=!r.ok;
+    if(r.ok){SRV.list=SRV.list.filter(x=>x.id!==d.srvdel);if(SRV.id===d.srvdel){SRV.id=null;SRV.version=0;srvStore();srvBanner()}}
+    srvDraw();return}
+  if(d.srvrm!=null&&SRV.share){SRV.share.list.splice(+d.srvrm,1);srvDrawShare();return}
+  if(t.id==="srvAddBtn"&&SRV.share){srvAddTyped();return}
+  if(t.id==="srvShareBack"){SRV.share=null;SRV.msg="";srvDraw();return}
+  if(t.id==="srvShareSave"&&SRV.share){
+    if(!srvAddTyped(true))return;   /* an email typed but not added is added now, so it is never lost */
+    const r=await srvCall("/api/estimates/share",{id:SRV.share.id,sharedWith:SRV.share.list,orgView:$("srvOrg").checked});
+    if(!r.ok){SRV.msg=r.j.error||"Could not save sharing.";SRV.err=true;srvDrawShare();return}
+    const x=SRV.list.find(q=>q.id===SRV.share.id);if(x){x.shared=r.j.sharedWith.length;x.orgView=r.j.estimate.orgView}
+    SRV.share=null;SRV.msg="Sharing saved.";SRV.err=false;srvDraw();return}
+});
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target&&e.target.id==="srvAddEmail"){e.preventDefault();srvAddTyped()}});
+document.addEventListener("input",e=>{if(e.target&&e.target.id==="srvFilter"){SRV.filter=e.target.value;const pos=e.target.selectionStart;srvDraw();const f=$("srvFilter");if(f){f.focus();try{f.setSelectionRange(pos,pos)}catch(x){}}}});
+document.addEventListener("change",e=>{if(e.target&&e.target.dataset&&e.target.dataset.srvacc!=null&&SRV.share){SRV.share.list[+e.target.dataset.srvacc].access=e.target.value;SRV.share.org=$("srvOrg").checked}});
+/* a view-only estimate can be read and navigated but not edited: edits and edit buttons inside the page are stopped before anything changes */
+["input","change"].forEach(ev=>document.addEventListener(ev,e=>{
+  if(!SRV.ro||!e.target||!e.target.closest||!e.target.closest("main,header.top")||e.target.closest("#srvDlg"))return;
+  e.stopImmediatePropagation();e.preventDefault();if(e.target.id==="dealName")e.target.value=S.deal||"";else renderAll();toast("This estimate is view only. Use Save a copy to edit your own.")
+},true));
+document.addEventListener("click",e=>{
+  if(!SRV.ro)return;const b=e.target.closest&&e.target.closest("main button, #resetBtn, #methodBtn");
+  if(!b||b.closest("#srvDlg")||b.hasAttribute("data-go")||b.hasAttribute("data-menu")||b.dataset.srv||b.closest(".tabs,.seg-nav"))return;
+  if(b.matches("#testBtn,#xlsBtn,#dlBtn,#mCust,[data-view],[data-tab]"))return;
+  e.stopImmediatePropagation();e.preventDefault();toast("This estimate is view only. Use Save a copy to edit your own.")
+},true);
 document.addEventListener("click",async e=>{
   if(e.target&&e.target.id==="signOut"){try{await fetch("/api/logout",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:"{}"})}catch(x){}location.assign("/login.html")}
 });

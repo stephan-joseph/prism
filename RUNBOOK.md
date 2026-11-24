@@ -85,6 +85,7 @@ Account files. Passwords are stored only as hashes. You would add each person ag
 
 - **Back up** after you add or remove people, after a role change, and weekly otherwise: `scripts/backup-data.sh ~/prism-backups/prism-backup-<date>.tgz` (the folder must exist). The backup holds password hashes: keep it private, never commit it.
 - **Keep the disk** if the volume claim is ever deleted: `kubectl patch pv <name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'` (find the name with `kubectl get pv`).
+- **Estimates on the server are in the backup** (`/data/estimates`), together with accounts and the audit log. Back up after people save or share, not only after adding people.
 - **Back up the Library separately.** It is on its own volume.
 
 See the README section "Backup, restore and rebuilding from scratch" for the manual version of these steps, and `scripts/rebuild-prism.sh --help` for the options. The rebuild script has not been run against a real cluster yet. Try it once in a sandbox you can afford to delete.

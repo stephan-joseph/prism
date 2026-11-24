@@ -107,7 +107,12 @@ Sign-in is on when the server has `SESSION_SECRET`. Without it the site is open 
 - **Extraction:** with sign-in on there is no passphrase. The server takes the person from the session. Each run record carries the email (document text is still never stored).
 - **Protection:** the same message for a wrong password and an unknown account, an account locks for 15 minutes after 5 failures (an address after 25), requests from another site are refused, and an audit log records sign-ins, failures, account changes and password changes (never a password). The last active administrator cannot be removed.
 - **Risk to know:** the address is plain `http` until a DNS name and certificate exist. Passwords and cookies then cross the network unencrypted. The login page says so. When the load balancer serves HTTPS, the server sees `X-Forwarded-Proto: https` and switches on `Secure` cookies and HSTS by itself. Until then, limit the load balancer to a known address range.
-- **Not covered:** company single sign-on, multi-factor sign-in, self-service password reset.
+- **Estimates on the server (sign-in on):** File, **Save to server** keeps the estimate on the site (`/data/estimates`, one file each, 2 MB at most). File, **Open from server** lists your estimates and the ones shared with you, with a filter by deal or owner. The browser copy stays the working copy, and File, Save file and the Library hand-off work as before.
+  - **Who sees what:** private to the owner by default. The owner or an administrator shares it with named people (they need an active account) as *view* (opens read only) or *edit* (can save), or lets everyone signed in view it. Administrators see and manage every estimate. A viewer account can open what is shared with them but never saves to the server, even where it is shared for edit. Only the owner or an administrator shares or deletes.
+  - **Two people, one estimate:** each save carries the version you opened. A save from an older version is refused with the newer copy, and the page asks whether to open theirs or keep yours. Nobody is overwritten silently. There is no live co-editing and no version history, only the latest saved copy.
+  - **View only:** a view-only estimate shows a banner, will not take edits, and never writes to your browser copy. **Save a copy to my estimates** makes it your own.
+  - The audit log records saves, shares and deletes (never the estimate content). Backups include `/data/estimates`.
+- **Not covered:** company single sign-on, multi-factor sign-in, self-service password reset, notification when something is shared with you (no email service).
 
 ## Backup, restore and rebuilding from scratch (EKS build)
 

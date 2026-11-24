@@ -195,4 +195,86 @@ let n = 0; const ok = (m) => console.log("ok", ++n, m);
   assert.equal((await fetch(ob + "/.netlify/functions/extract-usage")).status, 403); ok("with sign-in off the site is open and the passphrase still rules extraction");
   off.close();
 }
+
+/* ---- estimates saved on the server, and sharing ---- */
+{ const { makeServer } = await import("../server/server.mjs");
+  const { accessOf } = await import("../server/estimates.mjs");
+  const dir = mkdtempSync(path.join(tmpdir(), "e-"));
+  const env = { SESSION_SECRET: "test-secret-est-0123456789", ADMIN_EMAIL: "boss@example.test", ADMIN_PASSWORD: "first-admin-pass-1", ANTHROPIC_API_KEY: "k" };
+  const srv = makeServer({ env, dataDir: dir, makeClient: clientOf(reply('{"towers":[]}')) });
+  await srv.ready; await new Promise((r) => srv.listen(0, r));
+  const base = "http://localhost:" + srv.address().port;
+  const call = async (p, o = {}) => { let r; for (let i = 0; i < 2; i++) { try { r = await fetch(base + p, { redirect: "manual", ...o, headers: { "Content-Type": "application/json", Connection: "close", ...(o.headers || {}) } }); break; } catch (e) { if (i || o.noRetry) throw e; await wait(30); } } let j = null; try { j = await r.clone().json(); } catch {} return { r, j, status: r.status }; };
+  const post = (p, body, cookie) => call(p, { method: "POST", body: JSON.stringify(body), headers: cookie ? { Cookie: cookie } : {} });
+  const get = (p, cookie) => call(p, { headers: cookie ? { Cookie: cookie } : {} });
+  const ck = (x) => (x.r.headers.get("set-cookie") || "").split(";")[0];
+  const first = await post("/api/login", { email: "boss@example.test", password: "first-admin-pass-1" });
+  const A = ck(await post("/api/password", { current: "first-admin-pass-1", next: "a-new-admin-pass-22" }, ck(first)));
+  const person = async (email, role) => {
+    const c = await post("/api/users/create", { email, name: email.split("@")[0], role }, A);
+    const pw = email.split("@")[0] + "-password-123";
+    return ck(await post("/api/password", { current: c.j.tempPassword, next: pw }, ck(await post("/api/login", { email, password: c.j.tempPassword }))));
+  };
+  const O = await person("owner@example.test", "estimator"), S1 = await person("share@example.test", "estimator"), V = await person("viewer@example.test", "viewer"), X = await person("stranger@example.test", "estimator");
+  const state = (deal, extra = {}) => ({ deal, meta: { status: "draft", version: 1 }, hours: 8, ...extra });
+
+  /* rules in isolation */
+  const e0 = { owner: "owner@example.test", sharedWith: [{ email: "a@example.test", access: "edit" }, { email: "b@example.test", access: "view" }], orgView: false };
+  assert.equal(accessOf(e0, { email: "OWNER@example.test", role: "estimator" }), "owner"); assert.equal(accessOf(e0, { email: "a@example.test", role: "estimator" }), "edit");
+  assert.equal(accessOf(e0, { email: "b@example.test", role: "estimator" }), "view"); assert.equal(accessOf(e0, { email: "z@example.test", role: "estimator" }), "none");
+  assert.equal(accessOf(e0, { email: "z@example.test", role: "admin" }), "owner"); assert.equal(accessOf({ ...e0, orgView: true }, { email: "z@example.test", role: "viewer" }), "view"); assert.equal(accessOf(null, { email: "x", role: "admin" }), "none"); ok("access rules: owner, edit, view, stranger, admin, org view");
+
+  /* anonymous and sign-in off */
+  assert.equal((await get("/api/estimates")).status, 401); assert.equal((await post("/api/estimates/save", { state: state("x") })).status, 401); ok("estimates need a sign-in");
+
+  /* save, list, open */
+  const s1 = await post("/api/estimates/save", { state: state("Acme Retail") }, O); assert.equal(s1.status, 200); const id = s1.j.estimate.id; assert.match(id, /^[a-f0-9]{16}$/); assert.equal(s1.j.estimate.version, 1); assert.equal(s1.j.estimate.owner, "owner@example.test"); ok("an estimator saves a new estimate");
+  const l1 = await get("/api/estimates", O); assert.equal(l1.j.estimates.length, 1); assert.equal(l1.j.estimates[0].access, "owner");
+  assert.equal((await get("/api/estimates", X)).j.estimates.length, 0); assert.equal((await get("/api/estimates", V)).j.estimates.length, 0); assert.equal((await get("/api/estimates", A)).j.estimates.length, 1); ok("the list shows your own estimates, nothing to strangers or viewers, everything to an admin");
+  const g1 = await get("/api/estimates/get?id=" + id, O); assert.equal(g1.status, 200); assert.equal(g1.j.estimate.state.deal, "Acme Retail"); assert.deepEqual(g1.j.estimate.sharedWith, []); ok("the owner opens it, with the same state");
+  assert.equal((await get("/api/estimates/get?id=" + id, X)).status, 404); assert.equal((await get("/api/estimates/get?id=ffffffffffffffff", O)).status, 404); assert.equal((await get("/api/estimates/get?id=../../etc/passwd", O)).status, 404); ok("a stranger, a missing id and a path trick all get the same 404");
+
+  /* version conflict */
+  const u1 = await post("/api/estimates/save", { id, version: 1, state: state("Acme Retail", { hours: 16 }) }, O); assert.equal(u1.status, 200); assert.equal(u1.j.estimate.version, 2);
+  const stale = await post("/api/estimates/save", { id, version: 1, state: state("Acme Retail", { hours: 24 }) }, O); assert.equal(stale.status, 409); assert.equal(stale.j.current.state.hours, 16); assert.equal(stale.j.current.version, 2);
+  assert.equal((await post("/api/estimates/save", { id, state: state("x") }, O)).status, 400); ok("a save from an older version is refused and returns the newer copy");
+
+  /* sharing */
+  assert.equal((await post("/api/estimates/share", { id, sharedWith: [{ email: "share@example.test", access: "edit" }, { email: "viewer@example.test", access: "view" }] }, X)).status, 404);
+  const sh = await post("/api/estimates/share", { id, sharedWith: [{ email: "share@example.test", access: "edit" }, { email: "viewer@example.test", access: "view" }, { email: "OWNER@example.test", access: "view" }, { email: "viewer@example.test", access: "edit" }] }, O);
+  assert.equal(sh.status, 200); assert.equal(sh.j.sharedWith.length, 2); ok("the owner shares with named people, duplicates and the owner are dropped");
+  assert.equal((await post("/api/estimates/share", { id, sharedWith: [{ email: "nobody@example.test", access: "view" }] }, O)).status, 400); assert.equal((await post("/api/estimates/share", { id, sharedWith: [{ email: "bad", access: "view" }] }, O)).status, 400); ok("sharing needs a valid email with an active account");
+  assert.equal((await get("/api/estimates", S1)).j.estimates[0].access, "edit"); assert.equal((await get("/api/estimates", V)).j.estimates[0].access, "view"); ok("people see what is shared with them, with their access level");
+  assert.equal((await get("/api/estimates/get?id=" + id, V)).j.estimate.sharedWith, undefined); ok("only the owner sees who else it is shared with");
+  const e1 = await post("/api/estimates/save", { id, version: 2, state: state("Acme Retail", { hours: 12 }) }, S1); assert.equal(e1.status, 200); assert.equal(e1.j.estimate.updatedBy, "share@example.test"); assert.equal(e1.j.estimate.owner, "owner@example.test"); ok("a person with edit access saves, and the owner stays the owner");
+  assert.equal((await post("/api/estimates/save", { id, version: 3, state: state("x") }, V)).status, 403); ok("a viewer cannot save, even to an estimate shared for edit");
+  await post("/api/estimates/share", { id, sharedWith: [{ email: "viewer@example.test", access: "view" }, { email: "share@example.test", access: "view" }] }, O);
+  assert.equal((await post("/api/estimates/save", { id, version: 3, state: state("x") }, S1)).status, 403); ok("view access cannot save");
+  assert.equal((await post("/api/estimates/share", { id, sharedWith: [] }, S1)).status, 403); assert.equal((await post("/api/estimates/delete", { id }, S1)).status, 403); ok("only the owner or an admin shares or deletes");
+  assert.equal((await get("/api/estimates/get?id=" + id, X)).status, 404); await post("/api/estimates/share", { id, sharedWith: [], orgView: true }, O); assert.equal((await get("/api/estimates/get?id=" + id, X)).status, 200); assert.equal((await post("/api/estimates/save", { id, version: 3, state: state("x") }, X)).status, 403); ok("everyone-can-view lets any signed-in person open it, read only");
+  await post("/api/estimates/share", { id, sharedWith: [{ email: "share@example.test", access: "edit" }] }, O); assert.equal((await get("/api/estimates/get?id=" + id, X)).status, 404); ok("turning sharing off takes effect at once");
+
+  /* a deactivated person loses access */
+  await post("/api/users/update", { email: "share@example.test", active: false }, A);
+  assert.equal((await get("/api/estimates", S1)).status, 401); ok("a deactivated person is out at once");
+  assert.equal((await post("/api/estimates/share", { id, sharedWith: [{ email: "share@example.test", access: "view" }] }, O)).status, 400); ok("you cannot share with a deactivated account");
+
+  /* size cap, bad input */
+  const big = await post("/api/estimates/save", { state: { deal: "big", blob: "x".repeat(2 * 1024 * 1024 + 10) } }, O); assert.equal(big.status, 413); ok("an estimate over 2 MB is refused");
+  assert.equal((await post("/api/estimates/save", { state: "text" }, O)).status, 413); assert.equal((await post("/api/estimates/save", { state: [1] }, O)).status, 413); ok("the state must be an object");
+  /* the server answers 413 and drops the connection while the body is still arriving, so a client sees either the 413 or a reset */
+  const huge = await call("/api/estimates/save", { method: "POST", body: "x".repeat(3 * 1024 * 1024), headers: { Cookie: O }, noRetry: true }).then((x) => x.status, (e) => (/fetch failed/.test(String(e)) ? 413 : Promise.reject(e))); assert.equal(huge, 413); ok("a body far over the limit is refused before it is read");
+
+  await wait(50);   /* after a dropped upload, let the client forget its broken connection */
+  /* delete */
+  const gone = await post("/api/estimates/save", { state: state("To delete") }, X); const gid = gone.j.estimate.id;
+  assert.equal((await post("/api/estimates/delete", { id: gid }, O)).status, 404); assert.equal((await post("/api/estimates/delete", { id: gid }, X)).status, 200); assert.equal((await get("/api/estimates/get?id=" + gid, X)).status, 404); ok("the owner deletes; a stranger cannot even see it");
+  const adm = await post("/api/estimates/save", { state: state("Admin deletes") }, X); assert.equal((await post("/api/estimates/delete", { id: adm.j.estimate.id }, A)).status, 200); ok("an admin can delete any estimate");
+  const au = await get("/api/audit", A); assert.ok(au.j.events.some((e) => e.event === "estimate_saved") && au.j.events.some((e) => e.event === "estimate_shared") && au.j.events.some((e) => e.event === "estimate_deleted")); assert.ok(!JSON.stringify(au.j).includes("hours")); ok("saves, shares and deletes are in the audit log, without the estimate content");
+
+  /* round trip on disk and the other-site check */
+  const files = (await fileStore(path.join(dir, "estimates")).list({ prefix: "e/" })).blobs; assert.ok(files.length >= 1); assert.ok(!files.some((f) => /tmp/.test(f.key))); ok("estimates are plain files, with no temporary leftovers");
+  const evil = await call("/api/estimates/save", { method: "POST", body: JSON.stringify({ state: state("x") }), headers: { Cookie: O, Origin: "http://evil.example" } }); assert.equal(evil.status, 403); ok("a save from another site is refused");
+  srv.close();
+}
 console.log("all server tests pass");

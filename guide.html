@@ -683,6 +683,16 @@ ${tryTool(1,"Start at step 1 with a fresh estimate (Reset in the header).")}`},
 <tr><td>Viewer</td><td>Open the tool and this guide and use the calculators. Extraction is switched off.</td></tr>
 <tr><td>Estimator</td><td>Everything a viewer can, plus run extraction on documents. Each run is logged with your email, never with the document text.</td></tr>
 <tr><td>Admin</td><td>Everything an estimator can, plus add people, change roles, reset passwords and deactivate accounts (<span class="ui">Users</span>), and read the usage report.</td></tr></tbody></table>
+<h2>Saving and sharing estimates</h2>
+<p>Your work is kept in your own browser. If your site signs people in, you can also keep an estimate on the server and share it.</p>
+<ol class="steps">
+<li><div><span class="ui">File, Save to server</span> saves the estimate on the site. A banner shows it is on the server and its version.</div></li>
+<li><div><span class="ui">File, Open from server</span> lists your estimates and the ones shared with you. Type in the filter to find a deal or an owner. Opening replaces the estimate on screen, so save the one you are on first.</div></li>
+<li><div>In that list, <span class="ui">Share</span> lets you add people by email as <b>view</b> (read only) or <b>edit</b> (they can save changes), or let everyone signed in view it. They need an account first.</div></li>
+<li><div>If two people save the same estimate, the second save is not allowed to overwrite the first. Prism offers to open the newer version.</div></li>
+<li><div>A <b>view only</b> estimate shows a banner and does not take edits. Use <span class="ui">Save a copy to my estimates</span> to get one you can change.</div></li>
+</ol>
+<div class="note"><b>Good to know</b> Only the owner or an administrator can share or delete an estimate. Viewer accounts can open what is shared with them but cannot save. There is no live editing together and no version history. File, Save file still gives you a copy you keep yourself.</div>
 <div class="note"><b>Passwords</b> Five wrong tries lock the account for 15 minutes. If you forget your password, ask an administrator for a reset. Do not reuse a password from anywhere else: until the site has an encrypted (https) address, the sign-in page shows a warning.</div>`},
 {id:"glossary",grp:"Reference",t:"Glossary",html:()=>`
 <span class="eyebrow">Reference</span>
@@ -710,6 +720,8 @@ const EXAMPLE=[
 const FAQ=[
  ["Can one estimate cover APAC, North America and Europe?","Yes. Pick all three under Geographies to cover in Step 1, whatever the customer location is. Each keeps its own local hours, and the tool shows the combined window. The week is one daily pattern repeated on the days a week, with no daylight saving, so day edges are approximate."],
  ["I cannot run extraction. Why?","Your account may be a viewer. Viewers can use the calculators but not extraction. Ask an administrator to make you an estimator."],
+ ["Why is my estimate view only?","It belongs to someone else and was shared with you to view, or your account is a viewer. Use Save a copy to my estimates to get your own editable copy."],
+ ["Save to server says someone saved a newer version","Another person saved the same estimate after you opened it. Open their version, or keep yours and use File, Save file to keep a copy before opening theirs."],
  ["I forgot my password","Ask an administrator for a reset. They give you a one-time password and you choose a new one at your next sign-in."],
  ["Why did my bottom-up team get bigger when I turned on the coverage floor?","The support window needs a minimum number of people on duty in every hour, whatever the activity hours say. If the L2 and L3 roles from your activities come to less, the gap is added so the team can staff the window. Automation cannot take the team below it."],
  ["I changed the support window in bottom-up and my tower estimate moved. Why?","The support window, locations, complexity, contingency, manager ratio and existing team are shared by both methods. Enter them once; a change in either method changes both."],
