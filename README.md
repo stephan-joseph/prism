@@ -130,7 +130,7 @@ scripts/restore-data.sh prism-backup-<time>.tgz
 
 It shows what is in the file and asks you to type `yes`. It first saves the current data to `prism-prerestore-<time>.tgz` in the folder you ran it from, then unpacks the backup over `/data`. Files with the same name are replaced and nothing is deleted. It refuses an archive that is not a Prism backup. Undo: restore the `prism-prerestore` file. Tested against a real container: after the volume was wiped, a restore brought back the admin's changed password and another person's account.
 
-**Rebuild from scratch** (new cluster or lost volume), in this order:
+**Rebuild from scratch** (new cluster or lost volume). `RUNBOOK.md` has the step-by-step version and `scripts/rebuild-prism.sh` does it for you (run `--check` first; it has not yet been run against a real cluster). By hand, in this order:
 
 1. Make sure the cluster has a working storage class (`kubectl get storageclass`) and create the namespace `prism-damo`.
 2. Create the Secret `prism-secrets` from values kept outside the cluster (a password manager or AWS Secrets Manager): `ANTHROPIC_AUTH_TOKEN` or `ANTHROPIC_API_KEY`, `INTAKE_PASSPHRASE` if you still want one, `USAGE_ADMIN_KEY` if used, `SESSION_SECRET` (a new one is fine; it only signs everyone out), `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Keep a copy of the values, except the ones you made up only for the first sign-in.
