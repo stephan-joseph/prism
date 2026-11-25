@@ -21,7 +21,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: prism
-          image: stejose/prism:20261125-1
+          image: stejose/prism:20261126-1
           ports:
             - containerPort: 8080
           env:
