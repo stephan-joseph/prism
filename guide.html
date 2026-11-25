@@ -282,6 +282,36 @@ quiz:[
  {q:"You apply a proposed risk from the documents. What FTE effect does it have?",o:["Its suggested % immediately","None until you switch it on and set a %","It doubles the contingency"],a:1,why:"Imported risks arrive switched off at 0%, so the deal team decides the modifier."}
 ]},
 
+{id:"pairing",grp:"Start here",t:"Pairing on a deal",html:()=>`
+<span class="eyebrow">Start here · 3 min</span>
+<h1>Two SAs, one deal</h1>
+<p class="lead">When two of you work the same deal, save the estimate to the server and share it. Your work normally lives in your own browser, so your partner cannot see it until you do this.</p>
+<h2>You share it</h2>
+<ol class="steps">
+<li><div>Sign in and give the deal a name at the top.</div></li>
+<li><div><span class="ui">File, Save to server</span>. A banner shows the version.</div></li>
+<li><div><span class="ui">File, Open from server</span>, then <span class="ui">Share…</span> on your estimate.</div></li>
+<li><div>Type your partner's work email and press <span class="ui">Add</span>. They need a Prism account first. If they have none, ask an administrator.</div></li>
+<li><div>Choose <b>edit</b> if you both change the estimate. Choose <b>view</b> if your partner only reviews it.</div></li>
+<li><div>Press <span class="ui">Save sharing</span>. The button shows how many people you are sharing with.</div></li>
+<li><div><b>Message your partner.</b> Prism does not notify them.</div></li>
+</ol>
+<h2>Your partner opens it</h2>
+<ol class="steps">
+<li><div>Sign in, then <span class="ui">File, Open from server</span>. Type the deal name or the owner's email in the filter if the list is long.</div></li>
+<li><div>Click <span class="ui">Open</span> on the shared estimate.</div></li>
+<li><div>With <b>edit</b>, change it and use <span class="ui">File, Save to server</span>.</div></li>
+<li><div>With <b>view</b>, a banner says "View only" and nothing you type is kept. <span class="ui">Save a copy to my estimates</span> gives you your own copy to change.</div></li>
+</ol>
+<h2>Working on the same deal without losing work</h2>
+<ul>
+<li><b>Agree who is editing.</b> Prism does not merge two people's changes and there is no live editing together.</li>
+<li><b>Save before you hand over,</b> then tell your partner. They <b>open it from the server again</b> to get the latest, because an estimate they already have open does not update by itself.</li>
+<li><b>If a save is stopped</b> with "saved a newer version first", someone saved after you opened it. Open their version. To keep your own changes too, use <span class="ui">File, Save file</span> first, then open theirs and re-enter your changes.</li>
+<li>The latest saved copy is the one that counts. There is no version history.</li>
+</ul>
+<div class="note"><b>Good to know</b> Only the owner of an estimate or an administrator can share or delete it. Someone with edit access can change it but cannot pass it on. A <b>viewer</b> account can open shared estimates but cannot save. Work you never saved to the server stays only in your own browser, and <span class="ui">File, Save file</span> still gives you a copy on your computer. The <a href="#signin" data-go="signin">Signing in and roles</a> chapter has the roles.</div>
+<div class="tip"><b>First time?</b> Try it with your partner on a throwaway deal before a real one: one of you saves and shares, the other opens it, changes it and saves, then the first re-opens it.</div>`},
 {id:"clauses",grp:"Start here",t:"Contract clauses",html:()=>`
 <span class="eyebrow">Optional · between Step 0 and Step 1</span>
 <h1>Trace the team back to the contract</h1>
@@ -673,6 +703,8 @@ ${tryTool(1,"Start at step 1 with a fresh estimate (Reset in the header).")}`},
 <div id="faqList"></div>`},
 
 {id:"signin",grp:"Reference",t:"Signing in and roles",html:()=>`
+<span class="eyebrow">Reference</span>
+<h1>Signing in and roles</h1>
 <p class="lead">If your site asks you to sign in, an administrator made your account. This is what each role can do.</p>
 <ol class="steps">
 <li><div>Open the address. If you are not signed in you land on the sign-in page. Enter your email and password.</div></li>
@@ -684,7 +716,7 @@ ${tryTool(1,"Start at step 1 with a fresh estimate (Reset in the header).")}`},
 <tr><td>Estimator</td><td>Everything a viewer can, plus run extraction on documents. Each run is logged with your email, never with the document text.</td></tr>
 <tr><td>Admin</td><td>Everything an estimator can, plus add people, change roles, reset passwords and deactivate accounts (<span class="ui">Users</span>), and read the usage report.</td></tr></tbody></table>
 <h2>Saving and sharing estimates</h2>
-<p>Your work is kept in your own browser. If your site signs people in, you can also keep an estimate on the server and share it.</p>
+<p>Your work is kept in your own browser. If your site signs people in, you can also keep an estimate on the server and share it. The <a href="#pairing" data-go="pairing">Pairing on a deal</a> chapter has the handover advice for two SAs.</p>
 <ol class="steps">
 <li><div><span class="ui">File, Save to server</span> saves the estimate on the site. A banner shows it is on the server and its version.</div></li>
 <li><div><span class="ui">File, Open from server</span> lists your estimates and the ones shared with you. Type in the filter to find a deal or an owner. Opening replaces the estimate on screen, so save the one you are on first.</div></li>
@@ -720,6 +752,8 @@ const EXAMPLE=[
 const FAQ=[
  ["Can one estimate cover APAC, North America and Europe?","Yes. Pick all three under Geographies to cover in Step 1, whatever the customer location is. Each keeps its own local hours, and the tool shows the combined window. The week is one daily pattern repeated on the days a week, with no daylight saving, so day edges are approximate."],
  ["I cannot run extraction. Why?","Your account may be a viewer. Viewers can use the calculators but not extraction. Ask an administrator to make you an estimator."],
+ ["How do my partner and I work on the same deal?","Save it with File, Save to server, then Open from server and Share, adding your partner as edit. They open it from the same menu. Agree who is editing, save before you hand over, and have your partner open it again to see the latest. See the chapter Pairing on a deal."],
+ ["My partner shared an estimate but I cannot see it","Open File, Open from server again, because the list loads each time you open it. Check the filter box is empty. If it is still missing, your partner may have typed your email but not pressed Add and then Save sharing: ask them to open Share and check you are in the list. Prism does not notify you when something is shared."],
  ["Why is my estimate view only?","It belongs to someone else and was shared with you to view, or your account is a viewer. Use Save a copy to my estimates to get your own editable copy."],
  ["Save to server says someone saved a newer version","Another person saved the same estimate after you opened it. Open their version, or keep yours and use File, Save file to keep a copy before opening theirs."],
  ["I forgot my password","Ask an administrator for a reset. They give you a one-time password and you choose a new one at your next sign-in."],
@@ -742,7 +776,7 @@ const FAQ=[
  ["Do contract clauses change the team size?","No. Clauses only group the team that is already built, so you can show which part of the contract each FTE traces to. Add, edit or remove them and no number moves."],
  ["A tower shows 'Not linked to a clause' in Step 9. What do I do?","Open Contract clauses, or the tower in Step 2, and tick the clauses it serves. If the tower serves no listed clause, leave it. It stays in the table and the total still adds up."],
  ["Where are my estimates stored?","In your browser only, until you Save file. Clearing browser data or using another browser starts fresh."],
- ["Does the SDM count as part of a tower?","No. Service Delivery Managers are sized in Step 4 at 1 per 12 delivery FTE and appear under Governance in the team by role."]
+ ["Does the SDM count as part of a tower?","No. Service Delivery Managers are sized in Step 4 at 1 per 12 delivery FTE and appear under Governance in the team by role."],
  ["How do I choose between the tower method and bottom-up?","Use the tower method when you have ticket volumes and service towers to size from. Use bottom-up when the RFP lists the activities the supplier must perform and you want to size each one. You can switch from File, Sizing method; each method keeps its own inputs."],
  ["Why does an activity with a lever show no saving in bottom-up?","A lever only releases hours through the use cases behind it. If the activity ticks no use case, or the use cases it ticks are switched off or start later, the lever counts as zero. Step 5 lists these under its checks."],
  ["Why did extraction give an activity no hours?","Extraction never estimates hours. When an activity matches a starter library entry it takes that entry's proposed values; when it does not, you enter the hours."],
@@ -786,7 +820,7 @@ const GLOSS=[
  ["Coverage floor","The base team. Savings never cut below it when 'Keep the coverage floor' is on."],
  ["Deflection","Share of effort an AIOps use case removes at full adoption, combined per level and capped by a ceiling."],
  ["Confidence score","Annexure 1: nine weighted drivers scored 1–5, out of 100; bands Low / Medium / High / Highest."],
- ["[F], [P], proposed","Source tags: DAMO Solution Estimation Framework, AI_Works pricing sheet, or a value the framework doesn't give."]
+ ["[F], [P], proposed","Source tags: DAMO Solution Estimation Framework, AI_Works pricing sheet, or a value the framework doesn't give."],
  ["Bottom-up (activity based)","The second sizing method: the team comes from the hours of each RFP activity, not from towers and tickets. It is a separate flow with its own inputs."],
  ["Activity","One piece of work in the RFP, with a driver or quantity, hours per unit, an automation lever, roles and the use cases behind the lever."],
  ["Driver","What activities scale with in the bottom-up method, such as alerts a month, pipelines or hosts, with a Year 1 value and a yearly growth."],
@@ -880,6 +914,9 @@ function show(i,focus){
   if(focus){window.scrollTo({top:0});$("chap").focus({preventScroll:true})}
 }
 document.addEventListener("click",e=>{
+  /* a link to another chapter: <a href="#id" data-go="id"> */
+  const a=e.target.closest("a[data-go]");
+  if(a){const i=CH.findIndex(c=>c.id===a.dataset.go);if(i>=0){e.preventDefault();show(i,true)}return}
   const b=e.target.closest("button");if(!b)return;const d=b.dataset;
   if(d.ch!=null){show(+d.ch,true)}
   else if(d.next){P.done[CH[cur].id]=true;save();if(cur<CH.length-1)show(cur+1,true);else renderToc()}
