@@ -289,13 +289,22 @@ quiz:[
 <h2>You share it</h2>
 <ol class="steps">
 <li><div>Sign in and give the deal a name at the top.</div></li>
-<li><div><span class="ui">File, Save to server</span>. A banner shows the version.</div></li>
+<li><div>Type the deal name at the top, then <span class="ui">File, Save to server</span>. A new name is saved as a new deal. A banner shows the version.</div></li>
 <li><div><span class="ui">File, Open from server</span>, then <span class="ui">Share…</span> on your estimate.</div></li>
 <li><div>Type your partner's work email and press <span class="ui">Add</span>. They need a Prism account first. If they have none, ask an administrator.</div></li>
 <li><div>Choose <b>edit</b> if you both change the estimate. Choose <b>view</b> if your partner only reviews it.</div></li>
 <li><div>Press <span class="ui">Save sharing</span>. The button shows how many people you are sharing with.</div></li>
 <li><div><b>Message your partner.</b> Prism does not notify them.</div></li>
 </ol>
+<h2>Which deal does a save go to?</h2>
+<ul>
+<li><b>A name no deal has:</b> saved as a new deal, with no question.</li>
+<li><b>You changed the name</b> of the deal you have open: saved as a new deal. The old one is left as it is.</li>
+<li><b>The same name</b> as a deal on the server: Prism asks. <span class="ui">New version</span> replaces what is saved in that deal. <span class="ui">New deal</span> makes a separate one with the same name. Case and extra spaces do not matter.</li>
+<li><b>No name:</b> not saved. Name the deal first.</li>
+<li>A <b>version</b> only counts saves. The saved copy is replaced and older versions are not kept, so use <span class="ui">File, Save file</span> to keep a copy you may want back.</li>
+<li><span class="ui">Reset estimate</span> starts a blank estimate, so its next save is a new deal.</li>
+</ul>
 <h2>Your partner opens it</h2>
 <ol class="steps">
 <li><div>Sign in, then <span class="ui">File, Open from server</span>. Type the deal name or the owner's email in the filter if the list is long.</div></li>
@@ -718,7 +727,7 @@ ${tryTool(1,"Start at step 1 with a fresh estimate (Reset in the header).")}`},
 <h2>Saving and sharing estimates</h2>
 <p>Your work is kept in your own browser. If your site signs people in, you can also keep an estimate on the server and share it. The <a href="#pairing" data-go="pairing">Pairing on a deal</a> chapter has the handover advice for two SAs.</p>
 <ol class="steps">
-<li><div><span class="ui">File, Save to server</span> saves the estimate on the site. A banner shows it is on the server and its version.</div></li>
+<li><div><span class="ui">File, Save to server</span> saves the estimate on the site. The <b>deal name</b> decides where it goes: a new name makes a new deal, and a name that is already on the server asks you whether to save a <b>new version</b> or a <b>new deal</b>. A banner shows the deal and its version.</div></li>
 <li><div><span class="ui">File, Open from server</span> lists your estimates and the ones shared with you. Type in the filter to find a deal or an owner. Opening replaces the estimate on screen, so save the one you are on first.</div></li>
 <li><div>In that list, <span class="ui">Share</span> lets you add people by email as <b>view</b> (read only) or <b>edit</b> (they can save changes), or let everyone signed in view it. They need an account first.</div></li>
 <li><div>If two people save the same estimate, the second save is not allowed to overwrite the first. Prism offers to open the newer version.</div></li>
@@ -755,6 +764,8 @@ const FAQ=[
  ["How do my partner and I work on the same deal?","Save it with File, Save to server, then Open from server and Share, adding your partner as edit. They open it from the same menu. Agree who is editing, save before you hand over, and have your partner open it again to see the latest. See the chapter Pairing on a deal."],
  ["My partner shared an estimate but I cannot see it","Open File, Open from server again, because the list loads each time you open it. Check the filter box is empty. If it is still missing, your partner may have typed your email but not pressed Add and then Save sharing: ask them to open Share and check you are in the list. Prism does not notify you when something is shared."],
  ["Why is my estimate view only?","It belongs to someone else and was shared with you to view, or your account is a viewer. Use Save a copy to my estimates to get your own editable copy."],
+ ["I saved a second deal and it replaced my first. Why?","Before the deal name decided it, the page kept a link to the record you first saved, so a new estimate saved over it as the next version. Now a new name saves a new deal, and the same name asks whether to make a new version or a new deal. Old versions are never kept, so keep a File, Save file copy of anything you may want back."],
+ ["Prism asked me about a deal with the same name","A deal called that is already on the server. Choose New version to replace what is saved in it, or New deal for a separate one. If you did not mean to reuse the name, cancel and change the deal name first."],
  ["Save to server says someone saved a newer version","Another person saved the same estimate after you opened it. Open their version, or keep yours and use File, Save file to keep a copy before opening theirs."],
  ["I forgot my password","Ask an administrator for a reset. They give you a one-time password and you choose a new one at your next sign-in."],
  ["Why did my bottom-up team get bigger when I turned on the coverage floor?","The support window needs a minimum number of people on duty in every hour, whatever the activity hours say. If the L2 and L3 roles from your activities come to less, the gap is added so the team can staff the window. Automation cannot take the team below it."],

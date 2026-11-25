@@ -63,6 +63,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .srvbox{padding:16px 18px;display:grid;gap:12px;max-height:calc(100vh - 44px);overflow:auto}
 .srvhead{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .srvhead h3{margin:0;font-size:17px}
+#srvAsk{border:1px solid var(--line);border-radius:12px;padding:0;background:var(--surface);color:var(--ink);width:min(520px,calc(100vw - 24px))}
+#srvAsk::backdrop{background:rgba(0,0,0,.4)}
+.srvopts{display:grid;gap:8px}
+.srvopts .btn{text-align:left;padding:9px 12px;line-height:1.35}
 .srvrow{border:1px solid var(--line);border-radius:8px;padding:9px 11px;display:grid;gap:6px;background:var(--surface-2,var(--surface))}
 .srvrow .meta{font-size:12.5px;color:var(--muted)}
 .srvrow .acts{display:flex;flex-wrap:wrap;gap:6px}
@@ -627,6 +631,12 @@ tr.sel td{background:var(--accent-soft)}
 <dialog id="srvDlg" aria-labelledby="srvDlgH"><div class="srvbox">
   <div class="srvhead"><h3 id="srvDlgH">Estimates on the server</h3><button class="btn ghost" type="button" id="srvClose" aria-label="Close">Close</button></div>
   <div id="srvBody"></div>
+</div></dialog>
+<dialog id="srvAsk" aria-labelledby="srvAskH"><div class="srvbox">
+  <h3 id="srvAskH" style="margin:0;font-size:17px"></h3>
+  <div id="srvAskText" class="hint"></div>
+  <div id="srvAskOpts" class="srvopts"></div>
+  <div class="acts" style="display:flex;justify-content:flex-end"><button class="btn ghost" type="button" id="srvAskCancel">Cancel</button></div>
 </div></dialog>
 <main class="wrap">
   <!-- ===================== STAGE 0: DOCUMENTS ===================== -->
@@ -4008,6 +4018,32 @@ function runSelfTests(){
     const mgc=migrate(Object.assign(JSON.parse(JSON.stringify(testState(()=>{}))),{coverCap:"400"})), mgd=migrate(JSON.parse(JSON.stringify(testState(()=>{}))));
     add("Longest window: no cap argument keeps the old layout, and the setting is cleaned and defaults to 9","an uncapped India plus Ecuador covers 24 h; 400 becomes 24; an older estimate gets 9",`gap ${f3}; ${mgc.coverCap}; ${mgd.coverCap}`,f3===0&&mgc.coverCap===24&&mgd.coverCap===9,"migration");
   }
+  /* which deal does Save to server write to: the name decides */
+  {
+    const rec=(id,deal,access,over={})=>({id,deal,access:access||"owner",owner:"a@x.test",version:2,updatedAt:"2026-11-25T10:00:00.000Z",...over});
+    const L=[rec("A1","Acme Retail"),rec("B2","Beta Bank"),rec("C3","acme  retail","view"),rec("D4","Delta","edit")];
+    const t=(name,link,list=L)=>srvPlan(name,link,list);
+    const fresh=t("Gamma Co",null);
+    add("Save to server: a name no deal has is a new deal, with no question","nothing called Gamma Co, no link",fresh.action,fresh.action==="new"&&!fresh.versions.length,"invariant");
+    const renamed=t("Gamma Co",{id:"A1",name:"Acme Retail"});
+    add("Save to server: renaming the deal you have open makes a new deal, and says so","open Acme Retail, typed Gamma Co: new deal, renamed",`${renamed.action}, renamed ${renamed.renamed}`,renamed.action==="new"&&renamed.renamed===true,"invariant");
+    const same=t("  ACME   retail ",{id:"A1",name:"Acme Retail"});
+    add("Save to server: the same name asks, and the open deal is the first choice","case, spaces and double spaces do not matter; the deal you have open leads; a view-only deal is not offered",`${same.action}: ${same.versions.map(x=>x.id).join(",")}`,same.action==="ask"&&same.sameAsLink&&same.versions[0].id==="A1"&&!same.versions.some(x=>x.id==="C3"),"invariant");
+    const other=t("Beta Bank",{id:"A1",name:"Acme Retail"});
+    add("Save to server: a name another deal already has asks, even when the open deal is different","open Acme Retail, typed Beta Bank: asks, offers Beta Bank, renamed",`${other.action}: ${other.versions.map(x=>x.id).join(",")}; renamed ${other.renamed}`,other.action==="ask"&&other.versions.length===1&&other.versions[0].id==="B2"&&other.renamed&&!other.sameAsLink,"invariant");
+    const blank=t("   ",null);
+    add("Save to server: an empty name is a new deal, never a version","no name: new",blank.action,blank.action==="new","invariant");
+    const noLink=t("Beta Bank",null);
+    add("Save to server: a name on the server with nothing open still asks","no link, name matches Beta Bank",noLink.action,noLink.action==="ask"&&noLink.versions[0].id==="B2"&&!noLink.sameAsLink,"invariant");
+    const two=t("Acme Retail",null,[rec("A1","Acme Retail","owner",{updatedAt:"2026-11-20T00:00:00.000Z"}),rec("A9","Acme Retail","edit",{updatedAt:"2026-11-24T00:00:00.000Z"})]);
+    add("Save to server: two deals with one name are both offered, newest first","A9 then A1",two.versions.map(x=>x.id).join(","),two.action==="ask"&&two.versions.map(x=>x.id).join()==="A9,A1","invariant");
+    const lost=t("Acme Retail",{id:"Z9",name:"Acme Retail"});
+    add("Save to server: a deal you can no longer change is not written over","the open record was deleted or unshared: the name still matches your own Acme Retail, link marked lost",`${lost.action}, lost ${lost.lost}`,lost.lost===true&&!lost.sameAsLink&&lost.versions.map(x=>x.id).join()==="A1","invariant");
+    const viewOpen=t("Acme Retail",{id:"C3",name:"acme retail"});
+    add("Save to server: a deal opened view only is never offered as a version","link is view access: lost, only the owner's own deal is offered",`${viewOpen.lost}, ${viewOpen.versions.map(x=>x.id).join()}`,viewOpen.lost&&viewOpen.versions.map(x=>x.id).join()==="A1","invariant");
+    const nk=[nameKey("  Acme   Retail "),nameKey(null),nameKey("ACME")];
+    add("Save to server: names compare without case or extra spaces","'  Acme   Retail ' is 'acme retail'; null is empty",nk.join("|"),nk[0]==="acme retail"&&nk[1]===""&&nk[2]==="acme","invariant");
+  }
   /* outputs and timelines (coverage plan, Phase D) */
   {
     const eu3=st=>{st.region="eu";st.custLoc="c_de";st.tz=1;st.start=9;st.hours=8;st.days=5;st.custExtra=[{id:"a",region:"apac",loc:"c_sg",utc:8,s:9,h:8},{id:"b",region:"na",loc:"c_use",utc:-5,s:9,h:8}]};
@@ -6434,7 +6470,7 @@ document.addEventListener("click",e=>{
   else if(d.rmtower){S.towers=S.towers.filter(x=>x.id!==d.rmtower);renderS2();update();}
   else if(d.rmassume){const [k,i]=pair(d.rmassume);S.assumptions[k].splice(+i,1);renderAssume(k);update();}
   else if(d.rmrisk){const [k,id]=pair(d.rmrisk);S.risks[k]=S.risks[k].filter(r=>r.id!==id);renderRisks(k);update();}
-  else if(t.id==="resetBtn"){clearTimeout(t._rt);if(d.armed){delete d.armed;t.setAttribute("aria-label","Reset the estimate");S=defaults();renderAll();}else{d.armed="1";t.setAttribute("aria-label","Confirm reset: click again to clear the estimate");t._rt=setTimeout(()=>{delete t.dataset.armed;t.setAttribute("aria-label","Reset the estimate")},3000);}}
+  else if(t.id==="resetBtn"){clearTimeout(t._rt);if(d.armed){delete d.armed;t.setAttribute("aria-label","Reset the estimate");S=defaults();if(typeof SRV!=="undefined"){SRV.id=null;SRV.version=0;SRV.name="";SRV.ro=false;srvStore();srvBanner()}renderAll();}else{d.armed="1";t.setAttribute("aria-label","Confirm reset: click again to clear the estimate");t._rt=setTimeout(()=>{delete t.dataset.armed;t.setAttribute("aria-label","Reset the estimate")},3000);}}
   else if(t.id==="copyBtn"||t.id==="copyBtn2"){copySummary();}
   else if(t.id==="dlBtn"||t.id==="dlBtn2"){downloadReport();}
   else if(t.id==="saveBtn"){saveEstimate();}
@@ -6867,10 +6903,10 @@ async function loadAccount(){
 loadAccount();
 /* ---------- estimates saved on the server ----------
    The browser copy stays the working copy. Saving to the server is a choice, and a view-only estimate never writes over the browser copy. */
-const SRV={id:null,version:0,access:"owner",owner:"",ro:false,list:[],share:null,filter:"",msg:"",err:false};
+const SRV={id:null,version:0,name:"",access:"owner",owner:"",ro:false,list:[],share:null,filter:"",msg:"",err:false};
 const SRV_KEY="damo-srv-link";
-function srvStore(){try{if(SRV.id&&!SRV.ro)localStorage.setItem(SRV_KEY,JSON.stringify({id:SRV.id,version:SRV.version,owner:SRV.owner,deal:S.deal||""}));else localStorage.removeItem(SRV_KEY)}catch(e){}}
-function srvRestore(){try{const j=JSON.parse(localStorage.getItem(SRV_KEY)||"null");if(j&&/^[a-f0-9]{16}$/.test(j.id)){SRV.id=j.id;SRV.version=+j.version||0;SRV.owner=j.owner||"";SRV.access="owner"}}catch(e){}}
+function srvStore(){try{if(SRV.id&&!SRV.ro)localStorage.setItem(SRV_KEY,JSON.stringify({id:SRV.id,version:SRV.version,owner:SRV.owner,deal:SRV.name||""}));else localStorage.removeItem(SRV_KEY)}catch(e){}}
+function srvRestore(){try{const j=JSON.parse(localStorage.getItem(SRV_KEY)||"null");if(j&&/^[a-f0-9]{16}$/.test(j.id)){SRV.id=j.id;SRV.version=+j.version||0;SRV.owner=j.owner||"";SRV.name=j.deal||"";SRV.access="owner"}}catch(e){}}
 async function srvCall(path,body){
   try{
     const r=await fetch(path,{method:body?"POST":"GET",credentials:"same-origin",headers:body?{"Content-Type":"application/json"}:{},body:body?JSON.stringify(body):undefined});
@@ -6882,20 +6918,77 @@ async function srvCall(path,body){
 function srvBanner(){
   const b=$("srvBar");if(!b)return;
   if(SRV.ro){b.hidden=false;b.innerHTML=`<span><b>View only.</b> ${esc(S.deal||"This estimate")} belongs to ${esc(SRV.owner)}. Nothing you change here is saved, and your own browser copy is untouched.</span><button class="btn sm" type="button" data-srv="copy">Save a copy to my estimates</button><button class="btn sm ghost" type="button" data-srv="leave">Back to my own estimate</button>`}
-  else if(SRV.id&&ACCOUNT.on){b.hidden=false;b.innerHTML=`<span>On the server: <b>${esc(S.deal||"Untitled")}</b>, version ${SRV.version}${SRV.access==="edit"?` (shared with you to edit; owner ${esc(SRV.owner)})`:""}. Use File, Save to server to save changes.</span>`}
+  else if(SRV.id&&ACCOUNT.on){b.hidden=false;b.innerHTML=`<span>On the server: <b>${esc(S.deal||"Untitled")}</b>, version ${SRV.version}${SRV.access==="edit"?` (shared with you to edit; owner ${esc(SRV.owner)})`:""}. File, Save to server saves a new version. Change the deal name to save a new deal.</span>`}
   else b.hidden=true;
 }
 function srvAdopt(est,ro){
-  S=migrate(clone(est.state));SRV.id=est.id;SRV.version=est.version;SRV.owner=est.owner;SRV.access=est.access;SRV.ro=!!ro;
+  S=migrate(clone(est.state));SRV.id=est.id;SRV.version=est.version;SRV.owner=est.owner;SRV.access=est.access;SRV.ro=!!ro;SRV.name=(S.deal||"").trim();
   if(!ro)save();srvStore();srvBanner();renderAll();go(S.active||1);
+}
+/* ---------- which deal does Save to server write to? ----------
+   A deal is a record on the server. The name on screen decides: a changed name is a new deal; the same name asks whether to add a version or make a new deal;
+   a name that already exists on the server (that you may change) is treated the same way as the same name. A "version" only counts the saves: the
+   saved content is replaced and older versions are not kept. */
+function nameKey(s){return String(s==null?"":s).trim().replace(/\s+/g," ").toLowerCase()}
+function srvPlan(name,link,list){
+  const key=nameKey(name),can=x=>x.access==="owner"||x.access==="edit";
+  const linkRec=link?list.find(x=>x.id===link.id):null,linkOk=!!(linkRec&&can(linkRec)),lost=!!link&&!linkOk;
+  if(!key)return {action:"new",versions:[],lost,renamed:false,sameAsLink:false};
+  const sameAsLink=linkOk&&nameKey(link.name)===key;
+  const versions=list.filter(x=>can(x)&&nameKey(x.deal)===key);
+  if(sameAsLink&&!versions.some(x=>x.id===linkRec.id))versions.push(linkRec);
+  const lid=link&&link.id;
+  versions.sort((a,b)=>((b.id===lid)-(a.id===lid))||String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  return {action:versions.length?"ask":"new",versions,lost,renamed:linkOk&&!sameAsLink,sameAsLink};
+}
+function srvAsk(title,text,opts){
+  return new Promise(res=>{
+    const d=$("srvAsk");$("srvAskH").textContent=title;$("srvAskText").innerHTML=text;
+    $("srvAskOpts").innerHTML=opts.map((o,i)=>`<button type="button" class="btn ${o.primary?"primary":""}" data-ask="${i}"><b>${esc(o.label)}</b>${o.sub?`<small style="display:block;font-weight:400;opacity:.85;margin-top:2px">${esc(o.sub)}</small>`:""}</button>`).join("");
+    let done=false;
+    const onClose=()=>{if(!done){done=true;res(null)}};
+    d.addEventListener("close",onClose,{once:true});
+    d.onclick=e=>{const b=e.target.closest("[data-ask]");if(b&&!done){done=true;d.close();res(opts[+b.dataset.ask])}else if(e.target.id==="srvAskCancel")d.close()};
+    d.showModal();
+  });
+}
+function srvFinish(est,msg){
+  const wasRo=SRV.ro;
+  SRV.ro=false;SRV.id=est.id;SRV.version=est.version;SRV.owner=est.owner;SRV.access=est.access;SRV.name=(S.deal||"").trim();
+  if(wasRo)save();   /* a view-only estimate is now your own copy, so it becomes the browser copy too */
+  srvStore();srvBanner();if(wasRo)renderAll();toast(msg);
 }
 async function srvSave(){
   if(!ACCOUNT.on){toast("Sign-in is off on this site, so there is no server to save to.");return}
   if(ACCOUNT.user&&ACCOUNT.user.role==="viewer"){toast("Your account cannot save to the server. Ask an administrator for the estimator role.");return}
-  if(SRV.ro){await srvCopy();return}
-  const body=SRV.id?{id:SRV.id,version:SRV.version,state:S}:{state:S};
+  const name=(S.deal||"").trim();
+  if(!name&&!SRV.ro){toast("Name the deal first (the box at the top), so it can be told apart from your other deals.");return}
+  const lr=await srvCall("/api/estimates");
+  if(!lr.ok){toast(lr.j.error||"Could not check the server for deals with this name.");return}
+  const link=(!SRV.ro&&SRV.id)?{id:SRV.id,name:SRV.name||""}:null;
+  const plan=srvPlan(name,link,lr.j.estimates);
+  let choice={kind:"new"};
+  if(plan.action==="ask"){
+    const me=(ACCOUNT.user&&ACCOUNT.user.email)||"";
+    const opts=plan.versions.map((v,i)=>({kind:"version",rec:v,primary:plan.sameAsLink&&i===0,
+      label:`New version of "${v.deal}"${plan.versions.length>1?` (${i+1} of ${plan.versions.length}: last saved ${srvAgo(v.updatedAt)})`:""}`,
+      sub:`Now v${v.version}, becomes v${v.version+1}. Replaces what is saved. ${v.id===SRV.id&&!SRV.ro?"This is the deal you have open. ":""}${v.owner===me?"":"Owner "+v.owner+". "}Updated ${srvAgo(v.updatedAt)}${v.updatedBy?" by "+v.updatedBy:""}.`}));
+    opts.push({kind:"new",label:`New deal "${name}"`,sub:`A separate deal. The existing one is left as it is.${plan.versions.length?" There will then be "+(plan.versions.length+1)+" deals called "+name+".":""}`});
+    const text=plan.sameAsLink
+      ?`You have this deal open. A new version <b>replaces what is saved</b> and older versions are not kept. A new deal is a separate record and leaves the saved one as it is.`
+      :`${plan.renamed?`You changed the name from "${esc(link.name)}". `:""}A new version of the existing deal <b>replaces what is saved in it</b>, and older versions are not kept. A new deal leaves it as it is.`;
+    choice=await srvAsk(plan.sameAsLink?`Save "${name}" as a new version or a new deal?`:`A deal called "${name}" is already on the server`,text,opts);
+    if(!choice)return;
+  }
+  let body={state:S};
+  if(choice.kind==="version"){const own=choice.rec.id===SRV.id&&!SRV.ro;body={id:choice.rec.id,version:own?SRV.version:choice.rec.version,state:S}}
   const r=await srvCall("/api/estimates/save",body);
-  if(r.ok){SRV.id=r.j.estimate.id;SRV.version=r.j.estimate.version;SRV.owner=r.j.estimate.owner;SRV.access=r.j.estimate.access;srvStore();srvBanner();toast(`Saved to the server: version ${SRV.version}`);return}
+  if(r.ok){
+    const e=r.j.estimate;
+    srvFinish(e,choice.kind==="version"?`Saved as version ${e.version} of ${e.deal}`
+      :`Saved as a new deal: ${name}.${plan.renamed?` "${link.name}" is unchanged.`:""}${plan.lost?" You could no longer change the deal you had open.":""}`);
+    return;
+  }
   if(r.status===409){
     const c=r.j.current;
     if(confirm(`${c.updatedBy||"Someone"} saved a newer version (${c.version}) first.\n\nOK: open their version (your unsaved changes here are replaced).\nCancel: keep yours. Use File, Save file to keep a copy, then open theirs from the server.`))srvAdopt(c,false);
@@ -6903,11 +6996,7 @@ async function srvSave(){
   }
   toast(r.j.error||"Could not save to the server.");
 }
-async function srvCopy(){
-  const r=await srvCall("/api/estimates/save",{state:S});
-  if(!r.ok){toast(r.j.error||"Could not save a copy.");return}
-  SRV.ro=false;SRV.id=r.j.estimate.id;SRV.version=r.j.estimate.version;SRV.owner=r.j.estimate.owner;SRV.access="owner";save();srvStore();srvBanner();renderAll();toast("Saved a copy to your estimates. You can edit it now.");
-}
+async function srvCopy(){await srvSave()}
 function srvLeave(){S=load();SRV.id=null;SRV.ro=false;SRV.version=0;srvRestore();srvBanner();renderAll();go(S.active||1)}
 const srvAgo=iso=>{const m=Math.round((Date.now()-new Date(iso))/60000);return m<1?"just now":m<60?m+" min ago":m<1440?Math.round(m/60)+" h ago":new Date(iso).toISOString().slice(0,10)};
 async function srvOpenDialog(){
