@@ -6,3 +6,4 @@ _dbg.html
 _shot.html
 prism-backup-*.tgz
 prism-prerestore-*.tgz
+k8s/backup.local.env

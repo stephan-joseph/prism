@@ -1,0 +1,76 @@
+# Hourly backup of /data (accounts, deals, audit log, usage) to S3. Runs inside the cluster, so it needs nobody's login.
+#
+# Before applying:
+#   1. Create the bucket (private, encrypted, public access blocked) and give the pod permission to write to it. See README, "Hourly backup to S3".
+#   2. Put the bucket name and image tag into k8s/backup.local.env (see backup.local.env.example), then apply with:
+#        scripts/apply-backup.sh
+#      That fills in the bucket name and image tag below on the way to the cluster, so the real names never go into git.
+# Test one run now:   kubectl -n prism-damo create job --from=cronjob/prism-backup prism-backup-test
+#
+# The data disk (an EBS volume) attaches to one node at a time, so the backup pod must run on the same node as the prism pod.
+# The affinity rule below does that. If prism is down, the pod waits and the next hour tries again.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prism-backup
+  namespace: prism-damo
+data:
+  S3_BUCKET: "CHANGE-ME-your-private-bucket"
+  S3_PREFIX: "prism"
+  AWS_DEFAULT_REGION: "ap-southeast-1"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: prism-backup
+  namespace: prism-damo
+spec:
+  schedule: "0 * * * *"            # the top of every hour, UTC
+  concurrencyPolicy: Forbid        # never two at once
+  startingDeadlineSeconds: 1800    # a run missed by up to 30 minutes still starts
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 900   # give up after 15 minutes
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app: prism-backup
+        spec:
+          restartPolicy: Never
+          # run beside the prism pod so the disk can be mounted
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app: prism
+                  topologyKey: kubernetes.io/hostname
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+          containers:
+            - name: backup
+              # tar, gzip and the AWS CLI, with scripts/backup-to-s3.sh inside. Build it with k8s/backup-image/build.sh.
+              image: stejose/prism-backup:CHANGE-ME-tag
+              env:
+                - {name: SKIP_EXIT, value: "0"}   # a volume with no accounts yet is a skip, not a failed run
+              envFrom:
+                - configMapRef:
+                    name: prism-backup
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+                  readOnly: true
+              resources:
+                requests: {cpu: 50m, memory: 64Mi}
+                limits: {cpu: 300m, memory: 256Mi}
+          volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: prism-data
+                readOnly: true

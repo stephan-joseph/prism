@@ -137,12 +137,26 @@ APP_HOST="$(wait_host prism-damo prism)" || die "the app load balancer has no ad
 
 # ---- 7. restore the accounts ----
 STEP="restoring the backup"; say "Restoring accounts"
-if [ -n "$LATEST" ]; then
+LOCALENV="$APP_DIR/k8s/backup.local.env"
+S3NAME=""; [ -f "$LOCALENV" ] && S3NAME="$(sed -n 's/^S3_BUCKET=//p' "$LOCALENV" | head -1)"
+if [ -n "$S3NAME" ] && aws s3api head-bucket --bucket "$S3NAME" >/dev/null 2>&1 && [ -n "$(aws s3api list-objects-v2 --bucket "$S3NAME" --prefix prism/hourly/ --max-items 1 --query 'Contents[0].Key' --output text 2>/dev/null | grep -v '^None$' || true)" ]; then
+  echo "Restoring the newest hourly backup from s3://$S3NAME"
+  YESFLAG=""; [ "${ASSUME_YES:-0}" = 1 ] && YESFLAG="--yes"
+  ( cd "$BACKUP_DIR" 2>/dev/null || cd "$HOME"; S3_BUCKET="$S3NAME" "$APP_DIR/scripts/restore-from-s3.sh" )
+elif [ -n "$LATEST" ]; then
   echo "Using $LATEST"
   YESFLAG=""; [ "${ASSUME_YES:-0}" = 1 ] && YESFLAG="--yes"
   ( cd "$BACKUP_DIR" && "$APP_DIR/scripts/restore-data.sh" "$LATEST" $YESFLAG )
 else
   echo "No backup, so only the first admin exists. Add everyone else on the Users page."
+fi
+
+# ---- 7b. the hourly backup schedule ----
+STEP="restoring the hourly backup schedule"; say "Hourly backup to S3"
+if [ -f "$APP_DIR/k8s/backup.local.env" ]; then
+  "$APP_DIR/scripts/apply-backup.sh" || echo "The backup schedule was not applied. Run scripts/apply-backup.sh --test once the cluster is ready." >&2
+else
+  echo "No k8s/backup.local.env, so the hourly backup schedule was not applied. See the README, Hourly backup to S3."
 fi
 
 # ---- 8. is it up? ----
@@ -167,6 +181,6 @@ echo "Now:"
 echo "  1. Put the Library address in k8s/deployment.yaml (LIBRARY_URL) and commit it. The cluster already has it; git still has the old one."
 echo "  2. Tell the team the new App address. Everyone is signed out (a new session secret), and accounts are back only if a backup was restored."
 echo "  3. The Library's own curated deals are NOT restored. Its volume starts empty (LIBRARY_SEED=sample loads the samples only)."
-echo "  4. Back up again once things settle: scripts/backup-data.sh, then move the file into $BACKUP_DIR."
+echo "  4. The hourly backup to S3 resumes by itself once the schedule is applied (step above). Check it after the next hour: S3_BUCKET=<bucket> scripts/backup-age.sh."
 echo "  5. The addresses are plain http. Limit the load balancers to a known address range until there is https."
 echo "  6. When you no longer need this cluster:  eksctl delete cluster --name $NAME --region $REGION"

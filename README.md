@@ -147,6 +147,30 @@ It shows what is in the file and asks you to type `yes`. It first saves the curr
 
 **Keep the disk when the claim goes.** Find the volume with `kubectl get pv`, then set `kubectl patch pv <name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'`. The disk then survives a deleted claim or namespace and can be attached to a new cluster by hand. A disk snapshot schedule (AWS Backup or EBS snapshots) also covers a lost disk.
 
+## Hourly backup to S3 (EKS build)
+
+An hourly job inside the cluster copies `/data` (accounts, deals, audit log, usage history) to a private S3 bucket. It needs nobody's login, so it keeps running when you are away, and the files survive the cluster being deleted. It does not cover the Secret values (keep those in a password manager) or the Library's own volume.
+
+**How it works.** `k8s/backup-cronjob.yaml` is a CronJob that runs at the top of every hour (UTC) and never twice at once. It starts a small pod (`stejose/prism-backup`: tar, gzip and the AWS CLI, built from `k8s/backup-image` with `scripts/backup-to-s3.sh` inside). The pod mounts the `prism-data` volume read-only, tars it, checks the archive, uploads it to `s3://<bucket>/prism/hourly/prism-backup-<UTC time>.tgz` with server-side encryption, and confirms the file is in the bucket. At 00:00 UTC it also copies that file to `prism/daily/`. A volume with no accounts yet is skipped, not uploaded. Files the app writes are renamed into place, so a tar taken during a save never sees a half-written file. The worst case is one hour of lost saves.
+
+**The disk shares a node.** The data disk is an EBS volume, which attaches to one node at a time. The backup pod therefore has an affinity rule to run on the same node as the prism pod. If prism is down at that hour the backup pod waits, and the next hour tries again.
+
+**One-time setup (you do this; it needs your AWS login).** The commands are in `RUNBOOK.md`, "Set up the hourly backup". In short: create a private bucket, give the nodes permission to write to it, build the backup image (`k8s/backup-image/build.sh <tag>`), copy `k8s/backup.local.env.example` to `k8s/backup.local.env` and fill in the bucket name and image tag, then run `scripts/apply-backup.sh --test`. That file is git-ignored, so your AWS account number (it is part of the bucket name) never goes into the repo. `scripts/apply-backup.sh` fills the bucket name and tag into the manifest on the way to the cluster. **Do not apply `k8s/backup-cronjob.yaml` directly:** it holds placeholders in git and would break the live job.
+
+**Check it is working.** `S3_BUCKET=YOUR-BUCKET scripts/backup-age.sh` prints the age of the newest backup and exits 1 if it is older than 3 hours (`MAX_HOURS` changes that). Run it now and then, or from anything that alerts. If it says STALE, run `kubectl -n prism-damo get jobs` and `kubectl -n prism-damo logs -l app=prism-backup --tail=20`. Consider an S3 or CloudWatch alarm on "no new object in 3 hours" so a silent failure is noticed.
+
+**Restore:**
+```bash
+export S3_BUCKET=YOUR-BUCKET
+scripts/restore-from-s3.sh --list      # the newest 12 hourly backups and when each was saved
+scripts/restore-from-s3.sh             # the newest hourly backup
+scripts/restore-from-s3.sh daily       # the newest daily backup
+scripts/restore-from-s3.sh prism/hourly/prism-backup-20261126-060000.tgz   # a specific one
+```
+It downloads the file, shows what is in it, asks you to type `yes`, saves the current data to a `prism-prerestore-*.tgz` file first, and restores. Nothing is deleted by a restore.
+
+**Not tested here.** The tar, upload, daily copy, skip, restore and age check were tested against a local S3 server and a real Prism volume. What only your cluster can show is the permission to the real bucket and the backup pod landing on the same node as prism. The first manual run is that test.
+
 ## Usage and cost logging
 
 The extraction function writes one small record per run to a Netlify Blobs store (`damo-workflow-usage`): time, outcome, model, input and output tokens, cost, run time, and the number, type and size of the documents. It never stores document text or the answer. `usage.html` (on the same site) shows the report, and `/.netlify/functions/extract-usage` returns it as JSON or, with `&format=csv`, one row per run.
